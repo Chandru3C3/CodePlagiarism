@@ -1,0 +1,101 @@
+<div class="upload-container">
+  <mat-card class="upload-card">
+    <mat-card-header>
+      <mat-card-title>
+        <mat-icon>cloud_upload</mat-icon>
+        Upload Code Files
+      </mat-card-title>
+      <mat-card-subtitle>
+        Upload multiple code files to check for plagiarism
+      </mat-card-subtitle>
+    </mat-card-header>
+
+    <mat-card-content>
+      <div class="upload-area" 
+           [class.drag-over]="dragOver"
+           (click)="fileInput.click()"
+           (dragover)="onDragOver($event)"
+           (dragleave)="onDragLeave($event)"
+           (drop)="onDrop($event)">
+        <mat-icon class="upload-icon">cloud_upload</mat-icon>
+        <h3>Click to select files or drag and drop</h3>
+        <p class="hint">Supports: .java, .py, .cpp, .c, .js</p>
+        <p class="hint-secondary">Maximum file size: 10 MB</p>
+        <input #fileInput 
+               type="file" 
+               multiple 
+               accept=".java,.py,.cpp,.c,.js" 
+               (change)="onFileSelected($event)" 
+               style="display: none;">
+      </div>
+
+      <div *ngIf="selectedFiles.length > 0" class="selected-files-section">
+        <h3>Selected Files ({{ selectedFiles.length }})</h3>
+        <div class="file-list">
+          <div *ngFor="let file of selectedFiles; let i = index" class="file-item">
+            <mat-icon class="file-icon">{{ getFileIcon(file.name) }}</mat-icon>
+            <div class="file-details">
+              <span class="file-name">{{ file.name }}</span>
+              <span class="file-size">{{ getFileSize(file) }}</span>
+            </div>
+            <button mat-icon-button 
+                    color="warn" 
+                    (click)="removeFile(i)"
+                    matTooltip="Remove file">
+              <mat-icon>close</mat-icon>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div *ngIf="uploading" class="progress-section">
+        <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+        <p class="progress-text">
+          <mat-icon class="spin">sync</mat-icon>
+          Analyzing code for plagiarism...
+        </p>
+      </div>
+    </mat-card-content>
+
+    <mat-card-actions align="end">
+      <button mat-raised-button 
+              (click)="selectedFiles = []"
+              [disabled]="selectedFiles.length === 0 || uploading">
+        <mat-icon>clear_all</mat-icon>
+        Clear All
+      </button>
+      <button mat-raised-button 
+              color="primary" 
+              [disabled]="selectedFiles.length < 2 || uploading"
+              (click)="uploadFiles()">
+        <mat-icon>analytics</mat-icon>
+        {{ uploading ? 'Analyzing...' : 'Start Analysis' }}
+      </button>
+    </mat-card-actions>
+  </mat-card>
+
+  <mat-card class="info-card">
+    <mat-card-header>
+      <mat-card-title>
+        <mat-icon>info</mat-icon>
+        How It Works
+      </mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <ol class="steps-list">
+        <li>
+          <strong>Upload Files:</strong> Select at least 2 code files to compare
+        </li>
+        <li>
+          <strong>Automatic Analysis:</strong> System analyzes using multiple algorithms
+        </li>
+        <li>
+          <strong>View Results:</strong> See similarity scores and matching code segments
+        </li>
+        <li>
+          <strong>Generate Report:</strong> Download professional PDF report
+        </li>
+      </ol>
+    </mat-card-content>
+  </mat-card>
+</div>

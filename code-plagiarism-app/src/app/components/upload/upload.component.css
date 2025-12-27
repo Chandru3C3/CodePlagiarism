@@ -1,0 +1,193 @@
+.upload-container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.upload-card {
+  margin-bottom: 20px;
+}
+
+mat-card-header mat-card-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.5rem;
+}
+
+.upload-area {
+  border: 3px dashed #ccc;
+  border-radius: 12px;
+  padding: 60px 40px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background-color: #fafafa;
+}
+
+.upload-area:hover {
+  border-color: #3f51b5;
+  background-color: #f5f7ff;
+  transform: scale(1.01);
+}
+
+.upload-area.drag-over {
+  border-color: #3f51b5;
+  background-color: #e8eaf6;
+  border-width: 4px;
+}
+
+.upload-icon {
+  font-size: 80px;
+  width: 80px;
+  height: 80px;
+  color: #999;
+  margin-bottom: 20px;
+}
+
+.upload-area h3 {
+  margin: 10px 0;
+  color: #333;
+  font-weight: 500;
+}
+
+.hint {
+  color: #666;
+  margin: 8px 0;
+  font-size: 0.95rem;
+}
+
+.hint-secondary {
+  color: #999;
+  font-size: 0.85rem;
+}
+
+.selected-files-section {
+  margin-top: 30px;
+}
+
+.selected-files-section h3 {
+  margin-bottom: 15px;
+  color: #333;
+}
+
+.file-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.file-item {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 15px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  background-color: white;
+  transition: all 0.2s;
+}
+
+.file-item:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  border-color: #3f51b5;
+}
+
+.file-icon {
+  color: #3f51b5;
+  font-size: 28px;
+  width: 28px;
+  height: 28px;
+}
+
+.file-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.file-name {
+  font-weight: 500;
+  color: #333;
+  word-break: break-all;
+}
+
+.file-size {
+  font-size: 0.85rem;
+  color: #666;
+}
+
+.progress-section {
+  margin-top: 30px;
+  padding: 20px;
+  background-color: #f5f7ff;
+  border-radius: 8px;
+}
+
+.progress-text {
+  text-align: center;
+  color: #3f51b5;
+  font-weight: 500;
+  margin-top: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.spin {
+  animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+mat-card-actions {
+  padding: 16px;
+  gap: 10px;
+  display: flex;
+}
+
+.info-card {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.info-card mat-card-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: white;
+}
+
+.steps-list {
+  padding-left: 20px;
+  line-height: 2;
+}
+
+.steps-list li {
+  margin-bottom: 10px;
+}
+
+@media (max-width: 768px) {
+  .upload-area {
+    padding: 40px 20px;
+  }
+
+  .upload-icon {
+    font-size: 60px;
+    width: 60px;
+    height: 60px;
+  }
+
+  mat-card-actions {
+    flex-direction: column;
+  }
+
+  mat-card-actions button {
+    width: 100%;
+  }
+}

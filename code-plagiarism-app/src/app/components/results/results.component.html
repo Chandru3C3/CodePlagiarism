@@ -1,0 +1,149 @@
+<div class="results-container">
+  <!-- Summary Card -->
+  <mat-card class="summary-card">
+    <mat-card-header>
+      <mat-card-title>
+        <mat-icon>assessment</mat-icon>
+        Analysis Summary
+      </mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <div class="summary-stats">
+        <div class="stat">
+          <div class="stat-number">{{ results.length }}</div>
+          <div class="stat-label">Total Comparisons</div>
+        </div>
+        <div class="stat">
+          <div class="stat-number high-risk">{{ getHighRiskCount() }}</div>
+          <div class="stat-label">High Risk</div>
+        </div>
+        <div class="stat">
+          <div class="stat-number medium-risk">{{ getMediumRiskCount() }}</div>
+          <div class="stat-label">Medium Risk</div>
+        </div>
+        <div class="stat">
+          <div class="stat-number low-risk">{{ getLowRiskCount() }}</div>
+          <div class="stat-label">Low Risk</div>
+        </div>
+        <div class="stat">
+          <div class="stat-number">{{ getAverageSimilarity() }}%</div>
+          <div class="stat-label">Avg Similarity</div>
+        </div>
+      </div>
+      
+      <div class="export-buttons">
+        <button mat-raised-button 
+                color="primary" 
+                (click)="generatePdfReport()"
+                [disabled]="generatingPdf || results.length === 0">
+          <mat-icon>picture_as_pdf</mat-icon>
+          {{ generatingPdf ? 'Generating PDF...' : 'Download PDF Report' }}
+        </button>
+        
+        <button mat-raised-button 
+                color="accent" 
+                (click)="exportJson()"
+                [disabled]="results.length === 0">
+          <mat-icon>download</mat-icon>
+          Export JSON
+        </button>
+      </div>
+
+      <mat-progress-bar 
+        mode="indeterminate" 
+        *ngIf="generatingPdf"
+        class="pdf-progress">
+      </mat-progress-bar>
+    </mat-card-content>
+  </mat-card>
+
+  <!-- No Results Message -->
+  <mat-card *ngIf="results.length === 0" class="no-results">
+    <mat-card-content>
+      <mat-icon class="large-icon">search_off</mat-icon>
+      <h2>No Results Available</h2>
+      <p>Upload and analyze files to see results here</p>
+      <button mat-raised-button color="primary" (click)="navigateToUpload()">
+        <mat-icon>cloud_upload</mat-icon>
+        Go to Upload
+      </button>
+    </mat-card-content>
+  </mat-card>
+
+  <!-- Results Cards -->
+  <mat-card *ngFor="let result of results; let i = index" class="result-card">
+    <mat-card-header>
+      <div class="result-header-content">
+        <mat-card-title>
+          <mat-icon>compare_arrows</mat-icon>
+          Comparison {{ i + 1 }}
+        </mat-card-title>
+        <mat-chip [class]="getStatusClass(result.status)">
+          {{ result.status }} RISK
+        </mat-chip>
+      </div>
+    </mat-card-header>
+
+    <mat-card-content>
+      <div class="file-comparison">
+        <div class="file-info">
+          <mat-icon>description</mat-icon>
+          <span>{{ result.file1Name }}</span>
+        </div>
+        <mat-icon class="vs-icon">compare_arrows</mat-icon>
+        <div class="file-info">
+          <mat-icon>description</mat-icon>
+          <span>{{ result.file2Name }}</span>
+        </div>
+      </div>
+
+      <div class="similarity-section">
+        <div class="similarity-header">
+          <span class="similarity-label">Overall Similarity</span>
+          <span class="similarity-value">{{ result.overallSimilarity.toFixed(2) }}%</span>
+        </div>
+        <mat-progress-bar 
+          mode="determinate" 
+          [value]="result.overallSimilarity"
+          [color]="getProgressBarColor(result.overallSimilarity)">
+        </mat-progress-bar>
+      </div>
+
+      <div class="algorithm-breakdown">
+        <div class="algorithm-item">
+          <div class="algorithm-header">
+            <mat-icon>token</mat-icon>
+            <span>Token-Based</span>
+          </div>
+          <div class="algorithm-value">{{ result.tokenSimilarity.toFixed(2) }}%</div>
+        </div>
+        <div class="algorithm-item">
+          <div class="algorithm-header">
+            <mat-icon>account_tree</mat-icon>
+            <span>Structural (AST)</span>
+          </div>
+          <div class="algorithm-value">{{ result.structuralSimilarity.toFixed(2) }}%</div>
+        </div>
+      </div>
+
+      <div class="matches-section" *ngIf="result.matches && result.matches.length > 0">
+        <h4>
+          <mat-icon>content_copy</mat-icon>
+          Matching Code Segments
+        </h4>
+        <div class="matches-list">
+          <div *ngFor="let match of result.matches" class="match-item">
+            <div class="match-info">
+              <span class="match-lines">
+                Lines {{ match.line1Range }} ↔ Lines {{ match.line2Range }}
+              </span>
+            </div>
+            <mat-chip class="match-similarity">
+              {{ match.similarity.toFixed(2) }}%
+            </mat-chip>
+          </div>
+        </div>
+      </div>
+    </mat-card-content>
+  </mat-card>
+</div>

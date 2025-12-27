@@ -1,0 +1,114 @@
+<div class="dashboard-container">
+  <div class="dashboard-header">
+    <h1>Dashboard</h1>
+    <p>Overview of plagiarism detection system</p>
+  </div>
+
+  <div class="stats-grid" *ngIf="!loading">
+    <mat-card class="stat-card">
+      <mat-card-content>
+        <div class="stat-icon" style="background-color: #e3f2fd;">
+          <mat-icon style="color: #2196f3;">description</mat-icon>
+        </div>
+        <div class="stat-info">
+          <h2>{{ totalSubmissions }}</h2>
+          <p>Total Submissions</p>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="stat-card">
+      <mat-card-content>
+        <div class="stat-icon" style="background-color: #f3e5f5;">
+          <mat-icon style="color: #9c27b0;">compare_arrows</mat-icon>
+        </div>
+        <div class="stat-info">
+          <h2>{{ totalComparisons }}</h2>
+          <p>Total Comparisons</p>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <mat-card class="stat-card">
+      <mat-card-content>
+        <div class="stat-icon" style="background-color: #ffebee;">
+          <mat-icon style="color: #f44336;">warning</mat-icon>
+        </div>
+        <div class="stat-info">
+          <h2>{{ highRiskCount }}</h2>
+          <p>High Risk Cases</p>
+        </div>
+      </mat-card-content>
+    </mat-card>
+  </div>
+
+  <div class="loading-spinner" *ngIf="loading">
+    <mat-spinner></mat-spinner>
+  </div>
+
+  <div class="action-cards">
+    <mat-card class="action-card">
+      <mat-card-header>
+        <mat-card-title>
+          <mat-icon>cloud_upload</mat-icon>
+          Upload Files
+        </mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <p>Upload code files to check for plagiarism</p>
+      </mat-card-content>
+      <mat-card-actions>
+        <button mat-raised-button color="primary" (click)="navigateToUpload()">
+          Start Upload
+        </button>
+      </mat-card-actions>
+    </mat-card>
+
+    <mat-card class="action-card">
+      <mat-card-header>
+        <mat-card-title>
+          <mat-icon>assessment</mat-icon>
+          View Results
+        </mat-card-title>
+      </mat-card-header>
+      <mat-card-content>
+        <p>View detailed analysis and reports</p>
+      </mat-card-content>
+      <mat-card-actions>
+        <button mat-raised-button color="accent" (click)="navigateToResults()">
+          View Results
+        </button>
+      </mat-card-actions>
+    </mat-card>
+  </div>
+
+  <mat-card class="recent-results" *ngIf="recentResults.length > 0">
+    <mat-card-header>
+      <mat-card-title>Recent Comparisons</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <table class="results-table">
+        <thead>
+          <tr>
+            <th>File 1</th>
+            <th>File 2</th>
+            <th>Similarity</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let result of recentResults">
+            <td>{{ result.file1Name }}</td>
+            <td>{{ result.file2Name }}</td>
+            <td>{{ result.overallSimilarity?.toFixed(2) }}%</td>
+            <td>
+              <mat-chip [class]="'status-' + result.status?.toLowerCase()">
+                {{ result.status }}
+              </mat-chip>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </mat-card-content>
+  </mat-card>
+</div>

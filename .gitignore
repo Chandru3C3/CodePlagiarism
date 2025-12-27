@@ -1,0 +1,15 @@
+# Angular
+**/node_modules/
+**/dist/
+.angular/
+
+# Maven/Java
+**/target/
+.idea/
+*.iml
+.settings/
+.classpath
+.project
+
+# Misc
+.DS_Store
