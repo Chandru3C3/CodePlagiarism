@@ -1,0 +1,15 @@
+[build]
+  # This command builds your app
+  command = "npm run build"
+  # This is the folder Netlify will serve to the web
+  publish = "dist/code-plagiarism-app/browser"
+
+[[redirects]]
+  # This fixes the 404 error when you refresh the page
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[build.environment]
+  # Ensures Netlify uses a modern version of Node
+  NODE_VERSION = "20"

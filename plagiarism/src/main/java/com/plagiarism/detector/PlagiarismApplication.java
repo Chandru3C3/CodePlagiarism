@@ -22,9 +22,11 @@ public class PlagiarismApplication {
 		return new WebMvcConfigurer() {
 			@Override
 			public void addCorsMappings(CorsRegistry registry) {
-				registry.addMapping("/api/**") // Apply CORS to all /api endpoints
-						.allowedOrigins("http://localhost:4200", "https://chandru3c3.github.io") // Allow your Angular
-																									// origins
+				registry.addMapping("/cpd/**") // Apply CORS to all /api endpoints
+						.allowedOrigins("http://localhost:4200", "https://codeplagiarism.netlify.app",
+								"http://localhost:3000", "http://127.0.0.1:4200") // Allow your
+																					// Angular
+						// origins
 						.allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS") // Allow all common methods
 						.allowedHeaders("*") // Allow all headers
 						.allowCredentials(true) // Allow cookies and authentication headers

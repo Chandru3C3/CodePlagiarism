@@ -40,7 +40,7 @@ import com.plagiarism.detector.repository.SubmissionRepository;
 import com.plagiarism.detector.service.PlagiarismDetectionService;
 
 @RestController
-@RequestMapping("/api")
+@RequestMapping("/cpd")
 //@CrossOrigin(origins = { "http://localhost:4200", "http://localhost:3000" })
 public class PlagiarismController {
 
