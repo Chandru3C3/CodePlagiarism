@@ -8,6 +8,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { forkJoin } from 'rxjs';
 
 @Component({
   selector: 'app-dashboard',
@@ -43,25 +44,22 @@ export class DashboardComponent implements OnInit {
   loadDashboardData() {
     this.loading = true;
 
-    this.plagiarismService.getAllSubmissions().subscribe({
-      next: (submissions) => {
-        this.totalSubmissions = submissions.length;
-      },
-      error: (error) => console.error('Error loading submissions:', error)
-    });
-
-    this.plagiarismService.getAllResults().subscribe({
-      next: (results) => {
-        this.totalComparisons = results.length;
-        this.highRiskCount = results.filter((r: any) => r.status === 'HIGH').length;
-        this.recentResults = results.slice(-5).reverse();
-        this.loading = false;
-      },
-      error: (error) => {
-        console.error('Error loading results:', error);
-        this.loading = false;
-      }
-    });
+   forkJoin({
+    submissions: this.plagiarismService.getAllSubmissions(),
+    results: this.plagiarismService.getAllResults()
+  }).subscribe({
+    next: ({ submissions, results }) => {
+      this.totalSubmissions = submissions.length;
+      this.totalComparisons = results.length;
+      this.highRiskCount = results.filter((r: any) => r.status === 'HIGH').length;
+      this.recentResults = results.slice(-5).reverse();
+      this.loading = false;
+    },
+    error: (error) => {
+      console.error('Dashboard load failed:', error);
+      this.loading = false;
+    }
+  });
   }
 
   navigateToUpload() {
