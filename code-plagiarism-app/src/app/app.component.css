@@ -43,3 +43,10 @@
     padding: 10px;
   }
 }
+
+.app-logo {
+  width: 60px;   /* Fixed width */
+  height: 120px;  /* Fixed height */
+  object-fit: contain; /* Ensures the logo isn't squashed */
+  display: block;
+}
