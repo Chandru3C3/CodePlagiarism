@@ -6,8 +6,11 @@ import { Router } from '@angular/router';
 // Angular Material Imports
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatIconModule } from '@angular/material/icon';
+import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatButtonModule } from '@angular/material/button';
-import { AuthService } from './services/auth.service'; // Assuming you have an AuthService
+import { AuthService } from './services/auth.service';
+import { MatListModule } from '@angular/material/list';
+
 
 @Component({
   selector: 'app-root',
@@ -19,7 +22,9 @@ import { AuthService } from './services/auth.service'; // Assuming you have an A
     RouterLinkActive, // Good for styling active links
     MatToolbarModule, // For <mat-toolbar>
     MatIconModule,    // For <mat-icon>
-    MatButtonModule   // For mat-button attribute
+    MatButtonModule ,
+    MatSidenavModule,
+    MatListModule
   ],
   templateUrl: './app.component.html',
   styleUrl: './app.component.css'

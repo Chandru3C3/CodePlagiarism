@@ -1,30 +1,60 @@
-<mat-toolbar color="primary" *ngIf="authService.currentUser | async">
-  <mat-icon style="margin-right: 10px;">code</mat-icon>
-  <span>AI Code Plagiarism Detector</span>
-  
-  <span class="spacer"></span>
+<mat-sidenav-container class="app-container" *ngIf="authService.currentUser | async">
+  <mat-sidenav #sidenav mode="over" class="mobile-sidenav">
+    <mat-toolbar color="primary">Menu</mat-toolbar>
+    <mat-nav-list>
+      <a mat-list-item routerLink="/dashboard" (click)="sidenav.close()">
+        <mat-icon matListItemIcon>dashboard</mat-icon>
+        <span matListItemTitle>Dashboard</span>
+      </a>
+      <a mat-list-item routerLink="/upload" (click)="sidenav.close()">
+        <mat-icon matListItemIcon>cloud_upload</mat-icon>
+        <span matListItemTitle>Upload</span>
+      </a>
+      <a mat-list-item routerLink="/results" (click)="sidenav.close()">
+        <mat-icon matListItemIcon>assessment</mat-icon>
+        <span matListItemTitle>Results</span>
+      </a>
+      <mat-divider></mat-divider>
+      <a mat-list-item (click)="logout(); sidenav.close()">
+        <mat-icon matListItemIcon>logout</mat-icon>
+        <span matListItemTitle>Logout</span>
+      </a>
+    </mat-nav-list>
+  </mat-sidenav>
 
-  <button mat-button routerLink="/dashboard" routerLinkActive="active-link">
-    <mat-icon>dashboard</mat-icon>
-    Dashboard
-  </button>
+  <mat-sidenav-content>
+    <mat-toolbar color="primary" class="app-toolbar">
+      <button mat-icon-button class="menu-button" (click)="sidenav.toggle()">
+        <mat-icon>menu</mat-icon>
+      </button>
 
-  <button mat-button routerLink="/upload" routerLinkActive="active-link">
-    <mat-icon>cloud_upload</mat-icon>
-    Upload
-  </button>
+      <mat-icon class="toolbar-icon">code</mat-icon>
+      <span class="title">AI Plagiarism Detector</span>
+      
+      <span class="spacer"></span>
 
-  <button mat-button routerLink="/results" routerLinkActive="active-link">
-    <mat-icon>assessment</mat-icon>
-    Results
-  </button>
+      <div class="desktop-menu">
+        <button mat-button routerLink="/dashboard" routerLinkActive="active-link">
+          <mat-icon>dashboard</mat-icon> Dashboard
+        </button>
+        <button mat-button routerLink="/upload" routerLinkActive="active-link">
+          <mat-icon>cloud_upload</mat-icon> Upload
+        </button>
+        <button mat-button routerLink="/results" routerLinkActive="active-link">
+          <mat-icon>assessment</mat-icon> Results
+        </button>
+        <button mat-button (click)="logout()">
+          <mat-icon>logout</mat-icon> Logout
+        </button>
+      </div>
+    </mat-toolbar>
 
-  <button mat-button (click)="logout()">
-    <mat-icon>logout</mat-icon>
-    Logout
-  </button>
-</mat-toolbar>
+    <div class="main-container">
+      <router-outlet></router-outlet>
+    </div>
+  </mat-sidenav-content>
+</mat-sidenav-container>
 
-<div class="main-container">
+<div *ngIf="!(authService.currentUser | async)" class="main-container">
   <router-outlet></router-outlet>
 </div>

@@ -23,6 +23,7 @@ mat-card-header mat-card-title {
   cursor: pointer;
   transition: all 0.3s ease;
   background-color: #fafafa;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .upload-area:hover {
@@ -74,6 +75,7 @@ mat-card-header mat-card-title {
 .file-list {
   max-height: 400px;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .file-item {
@@ -98,6 +100,7 @@ mat-card-header mat-card-title {
   font-size: 28px;
   width: 28px;
   height: 28px;
+  flex-shrink: 0;
 }
 
 .file-details {
@@ -105,12 +108,14 @@ mat-card-header mat-card-title {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
 }
 
 .file-name {
   font-weight: 500;
   color: #333;
   word-break: break-all;
+  text-overflow: ellipsis;
 }
 
 .file-size {
@@ -149,6 +154,7 @@ mat-card-actions {
   padding: 16px;
   gap: 10px;
   display: flex;
+  justify-content: flex-end;
 }
 
 .info-card {
@@ -189,5 +195,55 @@ mat-card-actions {
 
   mat-card-actions button {
     width: 100%;
+  }
+}
+
+@media (max-width: 600px) {
+  .upload-container {
+    padding: 10px;
+  }
+
+  /* Compact Upload Area for Mobile */
+  .upload-area {
+    padding: 30px 15px;
+    border-width: 2px;
+  }
+
+  .upload-icon {
+    font-size: 50px;
+    width: 50px;
+    height: 50px;
+    margin-bottom: 15px;
+  }
+  
+  .upload-area h3 {
+    font-size: 1.1rem;
+  }
+
+  /* File Item Adjustments */
+  .file-item {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .file-name {
+    font-size: 0.95rem;
+  }
+
+  /* Full Width Buttons */
+  mat-card-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  mat-card-actions button {
+    width: 100%;
+    margin-left: 0 !important; /* Overrides any default margins */
+    height: 48px; /* Easier to tap */
+  }
+
+  .steps-list {
+    font-size: 0.9rem;
+    line-height: 1.6;
   }
 }

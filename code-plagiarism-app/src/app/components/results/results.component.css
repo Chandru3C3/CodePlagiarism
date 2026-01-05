@@ -10,10 +10,8 @@
   color: white;
 }
 
-.summary-card mat-card-header mat-card-title {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+.summary-card mat-card-header mat-card-title,
+.summary-card mat-card-header mat-icon {
   color: white;
 }
 
@@ -23,6 +21,7 @@
   gap: 20px;
   margin-bottom: 30px;
   padding: 20px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.2);
 }
 
 .stat {
@@ -30,7 +29,7 @@
 }
 
 .stat-number {
-  font-size: 3rem;
+  font-size: 2.5rem;
   font-weight: bold;
   color: white;
   margin-bottom: 8px;
@@ -100,6 +99,7 @@
   justify-content: space-between;
   align-items: center;
   width: 100%;
+  flex-wrap: wrap;
 }
 
 .result-card mat-card-title {
@@ -144,6 +144,7 @@
   flex: 1;
   font-weight: 500;
   color: #333;
+  min-width: 0;
 }
 
 .vs-icon {
@@ -151,6 +152,7 @@
   font-size: 32px;
   width: 32px;
   height: 32px;
+  flex-shrink: 0;
 }
 
 .similarity-section {
@@ -231,6 +233,7 @@
   background-color: #f9f9f9;
   border-radius: 8px;
   border: 1px solid #e0e0e0;
+  flex-wrap: wrap;
 }
 
 .match-info {
@@ -248,38 +251,53 @@
   font-weight: bold;
 }
 
+/* --- MOBILE RESPONSIVE TWEAKS --- */
 @media (max-width: 768px) {
+  .results-container {
+    padding: 10px;
+  }
+
+  /* Stack Summary Stats: 2 per row */
   .summary-stats {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: 1fr 1fr; 
+    gap: 15px;
   }
 
   .stat-number {
-    font-size: 2rem;
+    font-size: 1.8rem; /* Smaller numbers */
   }
 
-  .export-buttons {
-    flex-direction: column;
-  }
-
+  /* Full width buttons */
   .export-buttons button {
+    width: 100%;
+    margin-bottom: 0;
+  }
+
+  /* Stack File Comparison */
+  .file-comparison {
+    flex-direction: column;
+    text-align: center;
+    padding: 15px;
+  }
+
+  .file-info {
+    justify-content: center;
     width: 100%;
   }
 
-  .file-comparison {
-    flex-direction: column;
-  }
-
+  /* Rotate VS Icon */
   .vs-icon {
     transform: rotate(90deg);
+    margin: 10px 0;
   }
 
-  .algorithm-breakdown {
-    grid-template-columns: 1fr;
-  }
-
-  .result-header-content {
+  /* Adjust Match Item for small screens */
+  .match-item {
     flex-direction: column;
     align-items: flex-start;
-    gap: 10px;
+  }
+
+  .match-similarity {
+    align-self: flex-start;
   }
 }

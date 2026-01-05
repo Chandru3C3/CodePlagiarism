@@ -87,28 +87,30 @@
       <mat-card-title>Recent Comparisons</mat-card-title>
     </mat-card-header>
     <mat-card-content>
-      <table class="results-table">
-        <thead>
-          <tr>
-            <th>File 1</th>
-            <th>File 2</th>
-            <th>Similarity</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let result of recentResults">
-            <td>{{ result.file1Name }}</td>
-            <td>{{ result.file2Name }}</td>
-            <td>{{ result.overallSimilarity?.toFixed(2) }}%</td>
-            <td>
-              <mat-chip [class]="'status-' + result.status?.toLowerCase()">
-                {{ result.status }}
-              </mat-chip>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <div class="table-responsive">
+        <table class="results-table">
+          <thead>
+            <tr>
+              <th>File 1</th>
+              <th>File 2</th>
+              <th>Similarity</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let result of recentResults">
+              <td>{{ result.file1Name }}</td>
+              <td>{{ result.file2Name }}</td>
+              <td>{{ result.overallSimilarity?.toFixed(2) }}%</td>
+              <td>
+                <mat-chip [class]="'status-' + result.status?.toLowerCase()">
+                  {{ result.status }}
+                </mat-chip>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </mat-card-content>
   </mat-card>
 </div>

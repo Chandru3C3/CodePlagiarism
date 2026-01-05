@@ -4,13 +4,15 @@
       align-items: center;
       min-height: 100vh;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      padding: 20px;
+      padding: 16px;
+      overflow-y: auto;
     }
 
     .login-card {
       width: 100%;
       max-width: 450px;
-      padding: 20px;
+      padding: 24px;
+      box-sizing: border-box;
     }
 
     mat-card-header {
@@ -110,3 +112,32 @@
       display: inline-block;
       margin: 0 auto;
     }
+
+
+    @media (max-width: 480px) {
+  .login-container {
+    padding: 10px;
+    align-items: flex-start; /* Shifts card to top on tiny screens so keyboard doesn't hide it */
+    padding-top: 40px;
+  }
+
+  .login-card {
+    border-radius: 8px; /* Slightly softer corners for mobile */
+    padding: 16px;
+  }
+
+  .header-icon {
+    font-size: 36px; /* Smaller icon for mobile */
+    width: 36px;
+    height: 36px;
+  }
+
+  mat-card-title {
+    font-size: 20px; /* Smaller title */
+  }
+
+  /* Make buttons and inputs easier to tap on mobile */
+  .submit-btn {
+    height: 52px; 
+  }
+}
