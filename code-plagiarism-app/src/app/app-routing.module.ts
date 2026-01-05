@@ -1,15 +1,40 @@
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
-import { DashboardComponent } from './components/dashboard/dashboard.component';
-import { UploadComponent } from './components/upload/upload.component';
-import { ResultsComponent } from './components/results/results.component';
+import { authGuard } from './services/auth.guard';
 
 export const routes: Routes = [
-  { path: '', component: DashboardComponent },
-  { path: 'dashboard', component: DashboardComponent },
-  { path: 'upload', component: UploadComponent },
-  { path: 'results', component: ResultsComponent },
-  { path: '**', redirectTo: '' }
+  { 
+    path: 'login', 
+    loadComponent: () => import('./components/login/login.component').then(m => m.LoginComponent)
+  },
+  { 
+    path: 'register', 
+    loadComponent: () => import('./components/register/register.component').then(m => m.RegisterComponent)
+  },
+  { 
+    path: 'dashboard', 
+    loadComponent: () => import('./components/dashboard/dashboard.component').then(m => m.DashboardComponent),
+    canActivate: [authGuard]
+  },
+  { 
+    path: 'upload', 
+    loadComponent: () => import('./components/upload/upload.component').then(m => m.UploadComponent),
+    canActivate: [authGuard]
+  },
+  { 
+    path: 'results', 
+    loadComponent: () => import('./components/results/results.component').then(m => m.ResultsComponent),
+    canActivate: [authGuard]
+  },
+  { 
+    path: '', 
+    redirectTo: '/login', 
+    pathMatch: 'full' 
+  },
+  { 
+    path: '**', 
+    redirectTo: '/login' 
+  }
 ];
 
 @NgModule({

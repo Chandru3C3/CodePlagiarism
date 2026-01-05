@@ -1,11 +1,13 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
+import { Router } from '@angular/router';
 
 // Angular Material Imports
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
+import { AuthService } from './services/auth.service'; // Assuming you have an AuthService
 
 @Component({
   selector: 'app-root',
@@ -24,4 +26,10 @@ import { MatButtonModule } from '@angular/material/button';
 })
 export class AppComponent {
   title = 'Code Plagiarism Detector';
+ constructor(public authService: AuthService, private router: Router) {}
+
+  logout() {
+    this.authService.logout();
+    this.router.navigate(['/login']);
+  }
 }

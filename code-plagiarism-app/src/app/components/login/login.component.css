@@ -1,0 +1,112 @@
+.login-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 20px;
+    }
+
+    .login-card {
+      width: 100%;
+      max-width: 450px;
+      padding: 20px;
+    }
+
+    mat-card-header {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-bottom: 30px;
+    }
+
+    .header-icon {
+      font-size: 48px;
+      width: 48px;
+      height: 48px;
+      color: #667eea;
+      margin-bottom: 10px;
+    }
+
+    mat-card-title {
+      font-size: 24px;
+      font-weight: 600;
+      text-align: center;
+      margin-bottom: 8px;
+    }
+
+    mat-card-subtitle {
+      text-align: center;
+      font-size: 14px;
+    }
+
+    .full-width {
+      width: 100%;
+      margin-bottom: 16px;
+    }
+
+    .submit-btn {
+      height: 48px;
+      font-size: 16px;
+      margin-top: 16px;
+    }
+
+    .error-message {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #f44336;
+      font-size: 14px;
+      margin-bottom: 16px;
+      padding: 10px;
+      background-color: #ffebee;
+      border-radius: 4px;
+    }
+
+    .error-message mat-icon {
+      font-size: 20px;
+      width: 20px;
+      height: 20px;
+    }
+
+    .links-container {
+      margin-top: 16px;
+      text-align: right;
+    }
+
+    .link {
+      color: #667eea;
+      text-decoration: none;
+      font-size: 14px;
+    }
+
+    .link:hover {
+      text-decoration: underline;
+    }
+
+    mat-card-footer {
+      padding: 20px 0 0 0;
+      border-top: 1px solid #e0e0e0;
+      margin-top: 20px;
+    }
+
+    .register-link {
+      text-align: center;
+      font-size: 14px;
+      margin: 0;
+    }
+
+    .register-link a {
+      color: #667eea;
+      font-weight: 600;
+      text-decoration: none;
+    }
+
+    .register-link a:hover {
+      text-decoration: underline;
+    }
+
+    mat-spinner {
+      display: inline-block;
+      margin: 0 auto;
+    }

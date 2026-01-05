@@ -1,27 +1,8 @@
-<div class="app-container">
-  <mat-toolbar color="primary" class="app-toolbar">
-    <mat-icon class="toolbar-icon">code</mat-icon>
-    <span class="toolbar-title">AI Code Plagiarism Detector</span>
-    <span class="spacer"></span>
-    <button mat-button routerLink="/dashboard">
-      <mat-icon>dashboard</mat-icon>
-      Dashboard
-    </button>
-    <button mat-button routerLink="/upload">
-      <mat-icon>cloud_upload</mat-icon>
-      Upload
-    </button>
-    <button mat-button routerLink="/results">
-      <mat-icon>assessment</mat-icon>
-      Results
-    </button>
-  </mat-toolbar>
+<mat-toolbar color="primary" *ngIf="authService.currentUser | async">
+  <span>AI Code Plagiarism Detector</span>
+  <span class="spacer"></span>
+  <button mat-button routerLink="/dashboard">Dashboard</button>
+  <button mat-button (click)="logout()">Logout</button>
+</mat-toolbar>
 
-  <div class="content-wrapper">
-    <router-outlet></router-outlet>
-  </div>
-
-  <footer class="app-footer">
-    <p>&copy; 2024 Code Plagiarism Detector | MCA Final Year Project</p>
-  </footer>
-</div>
+<router-outlet></router-outlet>
