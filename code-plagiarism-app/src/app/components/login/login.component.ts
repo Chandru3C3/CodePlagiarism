@@ -9,6 +9,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { AuthService } from '../../services/auth.service';
+import { NgOptimizedImage } from '@angular/common';
 
 @Component({
   selector: 'app-login',
@@ -22,7 +23,8 @@ import { AuthService } from '../../services/auth.service';
     MatInputModule,
     MatButtonModule,
     MatIconModule,
-    MatProgressSpinnerModule
+    MatProgressSpinnerModule,
+    NgOptimizedImage
   ],
   templateUrl: './login.component.html',
   styleUrl: './login.component.css'
