@@ -1,8 +1,30 @@
 <mat-toolbar color="primary" *ngIf="authService.currentUser | async">
+  <mat-icon style="margin-right: 10px;">code</mat-icon>
   <span>AI Code Plagiarism Detector</span>
+  
   <span class="spacer"></span>
-  <button mat-button routerLink="/dashboard">Dashboard</button>
-  <button mat-button (click)="logout()">Logout</button>
+
+  <button mat-button routerLink="/dashboard" routerLinkActive="active-link">
+    <mat-icon>dashboard</mat-icon>
+    Dashboard
+  </button>
+
+  <button mat-button routerLink="/upload" routerLinkActive="active-link">
+    <mat-icon>cloud_upload</mat-icon>
+    Upload
+  </button>
+
+  <button mat-button routerLink="/results" routerLinkActive="active-link">
+    <mat-icon>assessment</mat-icon>
+    Results
+  </button>
+
+  <button mat-button (click)="logout()">
+    <mat-icon>logout</mat-icon>
+    Logout
+  </button>
 </mat-toolbar>
 
-<router-outlet></router-outlet>
+<div class="main-container">
+  <router-outlet></router-outlet>
+</div>
