@@ -10,8 +10,11 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import jakarta.validation.constraints.Email;
 
 @Entity
 @Table(name = "users", uniqueConstraints = { @UniqueConstraint(columnNames = "username"),
@@ -22,13 +25,14 @@ public class User {
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	private Long id;
 
-	@Column(nullable = false, length = 100)
+	@Column(name = "full_name", nullable = false, length = 100)
 	private String fullName;
 
 	@Column(nullable = false, unique = true, length = 50)
 	private String username;
 
 	@Column(nullable = false, unique = true, length = 100)
+	@Email
 	private String email;
 
 	@Column(nullable = false)
@@ -38,12 +42,29 @@ public class User {
 	private Boolean active = true;
 
 	@CreationTimestamp
-	@Column(nullable = false, updatable = false)
+	@Column(name = "created_at", nullable = false, updatable = false)
 	private LocalDateTime createdAt;
 
 	@UpdateTimestamp
-	@Column(nullable = false)
+	@Column(name = "updated_at", nullable = false)
 	private LocalDateTime updatedAt;
+
+	@Column(name = "reset_password_token")
+	private String resetPasswordToken;
+
+	@Column(name = "reset_password_expire")
+	private LocalDateTime resetPasswordExpire;
+
+	@PrePersist
+	protected void onCreate() {
+		createdAt = LocalDateTime.now();
+		updatedAt = LocalDateTime.now();
+	}
+
+	@PreUpdate
+	protected void onUpdate() {
+		updatedAt = LocalDateTime.now();
+	}
 
 	public User() {
 	}
@@ -123,6 +144,22 @@ public class User {
 
 	public void setUpdatedAt(LocalDateTime updatedAt) {
 		this.updatedAt = updatedAt;
+	}
+
+	public String getResetPasswordToken() {
+		return resetPasswordToken;
+	}
+
+	public void setResetPasswordToken(String resetPasswordToken) {
+		this.resetPasswordToken = resetPasswordToken;
+	}
+
+	public LocalDateTime getResetPasswordExpire() {
+		return resetPasswordExpire;
+	}
+
+	public void setResetPasswordExpire(LocalDateTime resetPasswordExpire) {
+		this.resetPasswordExpire = resetPasswordExpire;
 	}
 
 }

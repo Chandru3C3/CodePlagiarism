@@ -3,7 +3,7 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Observable, BehaviorSubject } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { isPlatformBrowser } from '@angular/common';
-import { environment } from '../../environments/environment'; 
+import { environment } from '../../environments/environment';
 
 export interface LoginRequest {
     emailOrUsername: string;
@@ -31,7 +31,7 @@ export interface AuthResponse {
     providedIn: 'root'
 })
 export class AuthService {
-    private apiUrl = environment.apiUrl+'/auth';
+    private apiUrl = environment.apiUrl + '/auth';
     private currentUserSubject: BehaviorSubject<any>;
     public currentUser: Observable<any>;
 
@@ -84,5 +84,13 @@ export class AuthService {
 
     isLoggedIn(): boolean {
         return !!this.getToken();
+    }
+
+    forgotPassword(email: string): Observable<any> {
+        return this.http.post(`${this.apiUrl}/forgot-password`, { email });
+    }
+
+    resetPassword(token: string, newPassword: string): Observable<any> {
+        return this.http.post(`${this.apiUrl}/reset-password`, { token, newPassword });
     }
 }
