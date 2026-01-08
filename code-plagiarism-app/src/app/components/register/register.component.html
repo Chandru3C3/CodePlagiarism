@@ -8,7 +8,7 @@
 
     <mat-card-content>
       <form [formGroup]="registerForm" (ngSubmit)="onSubmit()">
-        <mat-form-field appearance="outline" class="full-width">
+        <mat-form-field appearance="outline" class="full-width" subscriptSizing="dynamic">
           <mat-label>Full Name</mat-label>
           <mat-icon matPrefix>badge</mat-icon>
           <input matInput formControlName="fullName" placeholder="Enter your full name" inputmode="email"
@@ -21,7 +21,7 @@
           </mat-error>
         </mat-form-field>
 
-        <mat-form-field appearance="outline" class="full-width">
+        <mat-form-field appearance="outline" class="full-width" subscriptSizing="dynamic">
           <mat-label>Username</mat-label>
           <mat-icon matPrefix>person</mat-icon>
           <input matInput formControlName="username" placeholder="Choose a username" autocapitalize="none">
@@ -36,7 +36,7 @@
           </mat-error>
         </mat-form-field>
 
-        <mat-form-field appearance="outline" class="full-width">
+        <mat-form-field appearance="outline" class="full-width" subscriptSizing="dynamic">
           <mat-label>Email</mat-label>
           <mat-icon matPrefix>email</mat-icon>
           <input matInput type="email" formControlName="email" placeholder="Enter your email">
@@ -48,7 +48,7 @@
           </mat-error>
         </mat-form-field>
 
-        <mat-form-field appearance="outline" class="full-width">
+        <mat-form-field appearance="outline" class="full-width" subscriptSizing="dynamic">
           <mat-label>Password</mat-label>
           <mat-icon matPrefix>lock</mat-icon>
           <input matInput [type]="hidePassword ? 'password' : 'text'" formControlName="password"
@@ -67,7 +67,7 @@
           </mat-error>
         </mat-form-field>
 
-        <mat-form-field appearance="outline" class="full-width">
+        <mat-form-field appearance="outline" class="full-width" subscriptSizing="dynamic">
           <mat-label>Confirm Password</mat-label>
           <mat-icon matPrefix>lock_outline</mat-icon>
           <input matInput [type]="hideConfirmPassword ? 'password' : 'text'" formControlName="confirmPassword"

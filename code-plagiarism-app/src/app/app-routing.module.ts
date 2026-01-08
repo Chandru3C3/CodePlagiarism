@@ -31,7 +31,7 @@ export const routes: Routes = [
     loadComponent: () => import('./components/forgot-password/forgot-password.component').then(m => m.ForgotPasswordComponent)
   },
   { 
-    path: 'reset-password', 
+    path: 'reset-password/:token', 
     loadComponent: () => import('./components/reset-password/reset-password.component').then(m => m.ResetPasswordComponent)
   },
   { 
