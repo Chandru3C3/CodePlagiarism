@@ -565,22 +565,25 @@ public class PlagiarismController {
 		// ── DETAILED RESULTS (streamed one card at a time) ──────────────────
 		doc.add(sectionHeading("Detailed Comparison Results"));
 
+		// Locate this loop in your writePdfToStream method
 		for (int i = 0; i < results.size(); i++) {
-			try {
-				doc.add(buildComparisonCard(i + 1, results.get(i)));
-			} catch (Exception cardEx) {
-				// If one card fails, add a minimal error row and continue
-				System.err.println("[Report] Card " + (i + 1) + " failed: " + cardEx.getMessage());
-				Paragraph errP = new Paragraph(
-						"⚠  Comparison " + (i + 1) + " could not be rendered (" + cardEx.getMessage() + ")",
-						new Font(Font.FontFamily.HELVETICA, 9, Font.ITALIC, C_HIGH));
-				doc.add(errP);
-			}
+		    try {
+		        // Fix: Capture the list of elements and add them one by one
+		        List<Element> cardElements = buildComparisonCard(i + 1, results.get(i));
+		        for (Element element : cardElements) {
+		            doc.add(element);
+		        }
+		    } catch (Exception cardEx) {
+		        System.err.println("[Report] Card " + (i + 1) + " failed: " + cardEx.getMessage());
+		        Paragraph errP = new Paragraph(
+		                "⚠  Comparison " + (i + 1) + " could not be rendered (" + cardEx.getMessage() + ")",
+		                new Font(Font.FontFamily.HELVETICA, 9, Font.ITALIC, C_HIGH));
+		        doc.add(errP);
+		    }
 
-			// Flush the output every 10 comparisons to prevent buffer accumulation
-			if ((i + 1) % 10 == 0) {
-				writer.flush();
-			}
+		    if ((i + 1) % 10 == 0) {
+		        writer.flush();
+		    }
 		}
 
 		// ── DISCLAIMER ───────────────────────────────────────────────────────
@@ -602,10 +605,9 @@ public class PlagiarismController {
 		return d == null ? 0.0 : d;
 	}
 
-	// ─────────────────────────────────────────────────────────────────────────────
-	// COMPARISON CARD
-	// ─────────────────────────────────────────────────────────────────────────────
-	private PdfPTable buildComparisonCard(int idx, ComparisonResponse r) throws Exception {
+	private List<Element> buildComparisonCard(int idx, ComparisonResponse r) throws Exception {
+		List<Element> elements = new ArrayList<>();
+
 		String status = safe(r.getStatus()).toUpperCase();
 		double overall = safeDbl(r.getOverallSimilarity());
 		double token = safeDbl(r.getTokenSimilarity());
@@ -615,133 +617,125 @@ public class PlagiarismController {
 
 		BaseColor badge = "HIGH".equals(status) ? C_HIGH : "MEDIUM".equals(status) ? C_MEDIUM : C_LOW;
 
-		PdfPTable card = new PdfPTable(1);
-		card.setWidthPercentage(100);
-		card.setSpacingBefore(10);
+		// ── 1. Header row: "Comparison N" | "STATUS RISK" ─────────────────────
+		PdfPTable header = new PdfPTable(new float[] { 7f, 2.5f });
+		header.setWidthPercentage(100);
+		header.setSpacingBefore(12);
 
-		PdfPCell outer = new PdfPCell();
-		outer.setBorderColor(C_MGRAY);
-		outer.setBorderWidth(0.5f);
-		outer.setPadding(0);
+		PdfPCell titleCell = new PdfPCell(
+				new Phrase("Comparison " + idx, new Font(Font.FontFamily.HELVETICA, 11, Font.BOLD, C_NAVY)));
+		titleCell.setBackgroundColor(C_LGRAY);
+		titleCell.setPadding(10);
+		titleCell.setBorder(Rectangle.TOP | Rectangle.LEFT | Rectangle.BOTTOM);
+		titleCell.setBorderColor(C_MGRAY);
+		header.addCell(titleCell);
 
-		// ── Header row ──
-		PdfPTable hdr = new PdfPTable(new float[] { 7f, 2.5f });
-		hdr.setWidthPercentage(100);
+		Phrase badgePhrase = new Phrase(status + " RISK", new Font(Font.FontFamily.HELVETICA, 10, Font.BOLD, C_WHITE));
+		PdfPCell badgeCell = new PdfPCell(badgePhrase);
+		badgeCell.setBackgroundColor(badge);
+		badgeCell.setPadding(10);
+		badgeCell.setHorizontalAlignment(Element.ALIGN_CENTER);
+		badgeCell.setVerticalAlignment(Element.ALIGN_MIDDLE);
+		badgeCell.setBorder(Rectangle.TOP | Rectangle.RIGHT | Rectangle.BOTTOM);
+		badgeCell.setBorderColor(C_MGRAY);
+		header.addCell(badgeCell);
+		elements.add(header);
 
-		PdfPCell titleC = new PdfPCell();
-		titleC.setBorder(Rectangle.NO_BORDER);
-		titleC.setBackgroundColor(C_LGRAY);
-		titleC.setPadding(9);
-		titleC.addElement(
-				new Paragraph("Comparison " + idx, new Font(Font.FontFamily.HELVETICA, 11, Font.BOLD, C_NAVY)));
-		hdr.addCell(titleC);
-
-		PdfPCell badgeC = new PdfPCell();
-		badgeC.setBorder(Rectangle.NO_BORDER);
-		badgeC.setBackgroundColor(badge);
-		badgeC.setPadding(9);
-		badgeC.setVerticalAlignment(Element.ALIGN_MIDDLE);
-		Paragraph bp = new Paragraph(status + " RISK", new Font(Font.FontFamily.HELVETICA, 10, Font.BOLD, C_WHITE));
-		bp.setAlignment(Element.ALIGN_CENTER);
-		badgeC.addElement(bp);
-		hdr.addCell(badgeC);
-		outer.addElement(hdr);
-
-		// ── File names ──
+		// ── 2. File names row: file1 | ↔ | file2 ────────────────────────────
 		PdfPTable files = new PdfPTable(new float[] { 5f, 1f, 5f });
 		files.setWidthPercentage(100);
 
-		PdfPCell fc1 = new PdfPCell();
-		fc1.setBorder(Rectangle.NO_BORDER);
+		PdfPCell fc1 = new PdfPCell(
+				new Phrase("  \uD83D\uDCC4  " + f1, new Font(Font.FontFamily.HELVETICA, 10, Font.BOLD, C_TEXT)));
 		fc1.setBackgroundColor(new BaseColor(0xEE, 0xF1, 0xFB));
 		fc1.setPadding(9);
-		fc1.addElement(new Paragraph("📄  " + f1, new Font(Font.FontFamily.HELVETICA, 10, Font.BOLD, C_TEXT)));
+		fc1.setBorder(Rectangle.LEFT | Rectangle.BOTTOM);
+		fc1.setBorderColor(C_MGRAY);
 		files.addCell(fc1);
 
-		PdfPCell vsC = new PdfPCell(new Phrase("↔", new Font(Font.FontFamily.HELVETICA, 14, Font.BOLD, C_ACCENT)));
-		vsC.setBorder(Rectangle.NO_BORDER);
-		vsC.setHorizontalAlignment(Element.ALIGN_CENTER);
-		vsC.setVerticalAlignment(Element.ALIGN_MIDDLE);
-		vsC.setPadding(8);
-		files.addCell(vsC);
+		PdfPCell vsCell = new PdfPCell(
+				new Phrase("\u2194", new Font(Font.FontFamily.HELVETICA, 14, Font.BOLD, C_ACCENT)));
+		vsCell.setHorizontalAlignment(Element.ALIGN_CENTER);
+		vsCell.setVerticalAlignment(Element.ALIGN_MIDDLE);
+		vsCell.setPadding(8);
+		vsCell.setBorder(Rectangle.BOTTOM);
+		vsCell.setBorderColor(C_MGRAY);
+		files.addCell(vsCell);
 
-		PdfPCell fc2 = new PdfPCell();
-		fc2.setBorder(Rectangle.NO_BORDER);
+		PdfPCell fc2 = new PdfPCell(
+				new Phrase("\uD83D\uDCC4  " + f2 + "  ", new Font(Font.FontFamily.HELVETICA, 10, Font.BOLD, C_TEXT)));
 		fc2.setBackgroundColor(new BaseColor(0xEE, 0xF1, 0xFB));
 		fc2.setPadding(9);
-		Paragraph p2 = new Paragraph("📄  " + f2, new Font(Font.FontFamily.HELVETICA, 10, Font.BOLD, C_TEXT));
-		p2.setAlignment(Element.ALIGN_RIGHT);
-		fc2.addElement(p2);
+		fc2.setHorizontalAlignment(Element.ALIGN_RIGHT);
+		fc2.setBorder(Rectangle.RIGHT | Rectangle.BOTTOM);
+		fc2.setBorderColor(C_MGRAY);
 		files.addCell(fc2);
-		outer.addElement(files);
+		elements.add(files);
 
-		// ── Similarity bar ──
-		PdfPCell simCell = new PdfPCell();
-		simCell.setBorder(Rectangle.NO_BORDER);
-		simCell.setPadding(10);
+		// ── 3. Similarity label + percentage ─────────────────────────────────────
+		PdfPTable simLabel = new PdfPTable(new float[] { 7f, 3f });
+		simLabel.setWidthPercentage(100);
 
-		PdfPTable simLbl = new PdfPTable(new float[] { 7f, 3f });
-		simLbl.setWidthPercentage(100);
-		PdfPCell lblC = new PdfPCell(
+		PdfPCell slCell = new PdfPCell(
 				new Phrase("Overall Similarity", new Font(Font.FontFamily.HELVETICA, 9, Font.BOLD, C_SUBTEXT)));
-		lblC.setBorder(Rectangle.NO_BORDER);
-		PdfPCell pctC = new PdfPCell(new Phrase(String.format("%.2f%%", overall),
+		slCell.setPadding(10);
+		slCell.setPaddingBottom(2);
+		slCell.setBorder(Rectangle.LEFT);
+		slCell.setBorderColor(C_MGRAY);
+		simLabel.addCell(slCell);
+
+		PdfPCell spCell = new PdfPCell(new Phrase(String.format("%.2f%%", overall),
 				new Font(Font.FontFamily.HELVETICA, 14, Font.BOLD, C_ACCENT)));
-		pctC.setBorder(Rectangle.NO_BORDER);
-		pctC.setHorizontalAlignment(Element.ALIGN_RIGHT);
-		simLbl.addCell(lblC);
-		simLbl.addCell(pctC);
-		simCell.addElement(simLbl);
+		spCell.setPadding(10);
+		spCell.setPaddingBottom(2);
+		spCell.setHorizontalAlignment(Element.ALIGN_RIGHT);
+		spCell.setBorder(Rectangle.RIGHT);
+		spCell.setBorderColor(C_MGRAY);
+		simLabel.addCell(spCell);
+		elements.add(simLabel);
 
-		// Progress bar
-		float fill = (float) Math.max(0, Math.min(overall, 100));
+		// ── 4. Progress bar (two-cell table simulating fill) ─────────────────────
+		float fill = (float) Math.max(0.5, Math.min(overall, 99.5)); // avoid 0 or 100 cols
 		float empty = 100f - fill;
-		PdfPTable bar = new PdfPTable(fill > 0 && empty > 0 ? new float[] { fill, empty } : new float[] { 100f });
+		PdfPTable bar = new PdfPTable(new float[] { fill, empty });
 		bar.setWidthPercentage(100);
-		if (fill > 0 && empty > 0) {
-			PdfPCell filled = new PdfPCell();
-			filled.setBorder(Rectangle.NO_BORDER);
-			filled.setFixedHeight(7);
-			filled.setBackgroundColor(badge);
-			bar.addCell(filled);
-			PdfPCell emptyC = new PdfPCell();
-			emptyC.setBorder(Rectangle.NO_BORDER);
-			emptyC.setFixedHeight(7);
-			emptyC.setBackgroundColor(C_MGRAY);
-			bar.addCell(emptyC);
-		} else {
-			PdfPCell full = new PdfPCell();
-			full.setBorder(Rectangle.NO_BORDER);
-			full.setFixedHeight(7);
-			full.setBackgroundColor(fill >= 100 ? badge : C_MGRAY);
-			bar.addCell(full);
-		}
-		simCell.addElement(bar);
-		outer.addElement(simCell);
 
-		// ── Algorithm breakdown ──
+		PdfPCell filledCell = new PdfPCell(new Phrase(""));
+		filledCell.setBackgroundColor(badge);
+		filledCell.setFixedHeight(8);
+		filledCell.setBorder(Rectangle.LEFT);
+		filledCell.setBorderColor(C_MGRAY);
+		bar.addCell(filledCell);
+
+		PdfPCell emptyCell = new PdfPCell(new Phrase(""));
+		emptyCell.setBackgroundColor(C_MGRAY);
+		emptyCell.setFixedHeight(8);
+		emptyCell.setBorder(Rectangle.RIGHT);
+		emptyCell.setBorderColor(C_MGRAY);
+		bar.addCell(emptyCell);
+		elements.add(bar);
+
+		// ── 5. Algorithm breakdown ────────────────────────────────────────────────
 		PdfPTable algo = new PdfPTable(2);
 		algo.setWidthPercentage(100);
-		algo.addCell(algoCell("Token-Based Similarity", String.format("%.2f%%", token), C_ACCENT));
-		algo.addCell(algoCell("Structural (AST) Similarity", String.format("%.2f%%", ast), C_PURPLE));
-		outer.addElement(algo);
+		algo.setSpacingBefore(2);
+		algo.addCell(algoCell("Token-Based Similarity", String.format("%.2f%%", token), C_ACCENT, true));
+		algo.addCell(algoCell("Structural (AST) Similarity", String.format("%.2f%%", ast), C_PURPLE, false));
+		elements.add(algo);
 
-		// ── Matching segments ──
+		// ── 6. Matching segments table ────────────────────────────────────────────
 		if (r.getMatches() != null && !r.getMatches().isEmpty()) {
-			PdfPCell matchC = new PdfPCell();
-			matchC.setBorder(Rectangle.NO_BORDER);
-			matchC.setPaddingLeft(10);
-			matchC.setPaddingRight(10);
-			matchC.setPaddingBottom(10);
-
-			Paragraph mTitle = new Paragraph("Matching Code Segments",
-					new Font(Font.FontFamily.HELVETICA, 11, Font.BOLD, C_NAVY));
-			mTitle.setSpacingBefore(8);
-			mTitle.setSpacingAfter(5);
-			matchC.addElement(mTitle);
+			// Section label
+			Paragraph mTitle = new Paragraph("  Matching Code Segments",
+					new Font(Font.FontFamily.HELVETICA, 10, Font.BOLD, C_NAVY));
+			mTitle.setSpacingBefore(4);
+			mTitle.setSpacingAfter(4);
+			elements.add(mTitle);
 
 			PdfPTable mt = new PdfPTable(new float[] { 4f, 4f, 2f });
 			mt.setWidthPercentage(100);
+
+			// Header
 			for (String h : new String[] { "File 1 Lines", "File 2 Lines", "Similarity" }) {
 				PdfPCell mh = new PdfPCell(new Phrase(h, new Font(Font.FontFamily.HELVETICA, 9, Font.BOLD, C_WHITE)));
 				mh.setBackgroundColor(C_NAVY);
@@ -750,10 +744,13 @@ public class PlagiarismController {
 				mh.setHorizontalAlignment(Element.ALIGN_CENTER);
 				mt.addCell(mh);
 			}
+
+			// Rows
 			boolean alt = false;
 			for (var m : r.getMatches()) {
 				BaseColor rowBg = alt ? C_LGRAY : C_WHITE;
 				alt = !alt;
+
 				for (String txt : new String[] { "Lines " + safe(m.getLine1Range()),
 						"Lines " + safe(m.getLine2Range()) }) {
 					PdfPCell mc = new PdfPCell(
@@ -765,6 +762,7 @@ public class PlagiarismController {
 					mc.setBorderWidth(0.3f);
 					mt.addCell(mc);
 				}
+
 				PdfPCell sc = new PdfPCell(new Phrase(String.format("%.2f%%", safeDbl(m.getSimilarity())),
 						new Font(Font.FontFamily.HELVETICA, 9, Font.BOLD, C_WHITE)));
 				sc.setBackgroundColor(C_ACCENT);
@@ -774,12 +772,21 @@ public class PlagiarismController {
 				sc.setBorder(Rectangle.NO_BORDER);
 				mt.addCell(sc);
 			}
-			matchC.addElement(mt);
-			outer.addElement(matchC);
+			elements.add(mt);
 		}
 
-		card.addCell(outer);
-		return card;
+		// ── 7. Bottom border spacer ───────────────────────────────────────────────
+		PdfPTable bottomBorder = new PdfPTable(1);
+		bottomBorder.setWidthPercentage(100);
+		PdfPCell spacer = new PdfPCell(new Phrase(""));
+		spacer.setFixedHeight(4);
+		spacer.setBorder(Rectangle.BOTTOM | Rectangle.LEFT | Rectangle.RIGHT);
+		spacer.setBorderColor(C_MGRAY);
+		spacer.setBorderWidth(0.5f);
+		bottomBorder.addCell(spacer);
+		elements.add(bottomBorder);
+
+		return elements;
 	}
 
 	private void writeErrorPdf(String message, OutputStream out) throws Exception {
@@ -835,16 +842,19 @@ public class PlagiarismController {
 	}
 
 	// ─────────────────────────────────────────────────────────────────────────────
-	// ALGO CELL
+	// UPDATED algoCell — added isLeft param to control which border sides to draw
 	// ─────────────────────────────────────────────────────────────────────────────
-	private PdfPCell algoCell(String label, String value, BaseColor accent) {
+	private PdfPCell algoCell(String label, String value, BaseColor accent, boolean isLeft) {
 		PdfPCell c = new PdfPCell();
-		c.setBorder(Rectangle.LEFT);
+		c.setBorder(isLeft ? Rectangle.LEFT | Rectangle.BOTTOM : Rectangle.LEFT | Rectangle.RIGHT | Rectangle.BOTTOM);
+		c.setBorderColor(C_MGRAY);
 		c.setBorderColorLeft(accent);
 		c.setBorderWidthLeft(3f);
+		c.setBorderWidth(0.5f);
 		c.setBackgroundColor(C_LGRAY);
 		c.setPadding(10);
 		c.setPaddingLeft(14);
+
 		Paragraph l = new Paragraph(label, new Font(Font.FontFamily.HELVETICA, 8, Font.BOLD, C_SUBTEXT));
 		l.setSpacingAfter(4);
 		c.addElement(l);
