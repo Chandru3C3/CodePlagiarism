@@ -44,13 +44,14 @@ mat-card-subtitle {
 
 .full-width {
   width: 100%;
-  margin-bottom: 12px;
+  display: block;        /* Ensures the element respects top/bottom margins */
+  margin-bottom: 16px;   /* Increased from 16px to replace the missing padding */
 }
 
 .submit-btn {
   height: 48px;
   font-size: 16px;
-  margin-top: 16px;
+  margin-top: 10px;
 }
 
 .error-message {

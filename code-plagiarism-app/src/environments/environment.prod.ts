@@ -1,4 +1,4 @@
 export const environment = {
   production: true,
-  apiUrl: 'https://codeplagiarism.onrender.com/cpd'
+  apiUrl: 'https://codeplagiarism2.onrender.com/cpd'
 };
