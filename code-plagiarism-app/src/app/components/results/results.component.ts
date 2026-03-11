@@ -9,6 +9,10 @@ import { MatChipsModule } from '@angular/material/chips';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { StorageService } from '../../services/storage.service';
+import { HttpContext, HttpContextToken, HttpEventType } from '@angular/common/http';
+
+
+export const HTTP_TIMEOUT = new HttpContextToken<number>(() => 30_000);
 
 
 @Component({
@@ -29,6 +33,7 @@ export class ResultsComponent implements OnInit {
   submissionIds: number[] = [];
   generatingPdf = false;
   loading = false;
+  pdfStatus = '';
 
   constructor(
     private plagiarismService: PlagiarismService,
@@ -199,29 +204,56 @@ export class ResultsComponent implements OnInit {
     }
 
     this.generatingPdf = true;
+    this.pdfStatus = 'Preparing report…';
 
-    this.plagiarismService.generatePdfReport(this.submissionIds).subscribe({
-      next: (blob: Blob) => {
-        // Check if it's actually a PDF
-        if (blob.type === 'application/pdf' || blob.type === 'text/plain') {
-          const filename = blob.type === 'application/pdf'
-            ? `plagiarism-report-${Date.now()}.pdf`
-            : `plagiarism-report-${Date.now()}.txt`;
-          this.downloadBlob(blob, filename);
-          this.generatingPdf = false;
-          this.snackBar.open('Report downloaded successfully!', 'Close', { duration: 3000 });
-        } else {
-          throw new Error('Invalid response type');
+    this.plagiarismService
+      .generatePdfReport(this.submissionIds)
+      .subscribe({
+        next: (event: any) => {
+          // Handle progress events if the service uses reportProgress: true
+          if (event?.type === HttpEventType.UploadProgress) {
+            this.pdfStatus = 'Uploading request…';
+          } else if (event?.type === HttpEventType.DownloadProgress) {
+            const kb = event.loaded ? Math.round(event.loaded / 1024) : '?';
+            this.pdfStatus = `Downloading report… (${kb} KB)`;
+          } else if (event?.type === HttpEventType.Response || event instanceof Blob) {
+            const blob: Blob = event instanceof Blob ? event : event.body;
+            if (blob && (blob.type === 'application/pdf' || blob.type === 'text/plain')) {
+              const filename = blob.type === 'application/pdf'
+                ? `plagiarism-report-${Date.now()}.pdf`
+                : `plagiarism-report-${Date.now()}.txt`;
+              this.downloadBlob(blob, filename);
+              this.pdfStatus = '';
+              this.generatingPdf = false;
+              this.snackBar.open('✅ Report downloaded successfully!', 'Close', { duration: 3000 });
+            } else {
+              this.handlePdfError('Server returned an unexpected file type.');
+            }
+          }
+        },
+        error: (err) => {
+          console.error('PDF generation failed:', err);
+          const msg = err.status === 500
+            ? 'Server error while generating PDF. Check server logs.'
+            : err.status === 0
+              ? 'Request timed out or network error. Try with fewer files.'
+              : `Failed to generate report (HTTP ${err.status}).`;
+          this.handlePdfError(msg);
         }
-      },
-      error: (error) => {
-        console.error('PDF generation failed:', error);
-        this.generatingPdf = false;
-        this.snackBar.open('Failed to generate report. Please try again.', 'Close', {
-          duration: 3000
-        });
+      });
+
+    // Safety timeout on the Angular side — show friendly message after 90s
+    setTimeout(() => {
+      if (this.generatingPdf) {
+        this.pdfStatus = 'Still working… large reports may take up to 2 minutes.';
       }
-    });
+    }, 90_000);
+  }
+
+  private handlePdfError(message: string) {
+    this.generatingPdf = false;
+    this.pdfStatus = '';
+    this.snackBar.open(message, 'Close', { duration: 5000 });
   }
 
   private downloadBlob(blob: Blob, filename: string) {

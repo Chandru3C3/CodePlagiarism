@@ -1,8 +1,9 @@
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpContext } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { ComparisonResult, Submission, UploadResponse } from '../models/comparison.model';
-import { environment } from '../../environments/environment'; 
+import { environment } from '../../environments/environment';
+import { HTTP_TIMEOUT } from './http-timeout.interceptor';
 
 @Injectable({
   providedIn: 'root'
@@ -19,13 +20,13 @@ export class PlagiarismService {
       formData.append('files', file);
     });
     formData.append('username', username);
-    
+
     return this.http.post<UploadResponse>(`${this.apiUrl}/upload`, formData);
   }
 
   analyzeSubmissions(submissionIds: number[]): Observable<ComparisonResult[]> {
-    return this.http.post<ComparisonResult[]>(`${this.apiUrl}/analyze`, { 
-      submissionIds 
+    return this.http.post<ComparisonResult[]>(`${this.apiUrl}/analyze`, {
+      submissionIds
     });
   }
 
@@ -47,15 +48,19 @@ export class PlagiarismService {
   }
 
   generatePdfReport(submissionIds: number[]): Observable<Blob> {
-    return this.http.post(`${this.apiUrl}/generate-report`, 
-      { submissionIds },
-      { 
-        responseType: 'blob',  // This handles both text and binary
-        headers: new HttpHeaders({
-          'Accept': 'text/plain, application/pdf, application/json'
-        })
-      }
-    );
+  return this.http.post(
+    `${this.apiUrl}/generate-report`,
+    { submissionIds },
+    {
+      responseType: 'blob',
+      observe: 'body',
+      context: new HttpContext().set(HTTP_TIMEOUT, 120_000),
+      headers: new HttpHeaders({
+        'Content-Type': 'application/json',
+        'Accept': 'application/pdf, text/plain'
+      })
+    }
+  ); 
 }
 }
 

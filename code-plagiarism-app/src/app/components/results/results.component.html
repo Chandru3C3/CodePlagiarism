@@ -37,7 +37,7 @@
                 (click)="generatePdfReport()"
                 [disabled]="generatingPdf || results.length === 0">
           <mat-icon>picture_as_pdf</mat-icon>
-          {{ generatingPdf ? 'Generating PDF...' : 'Download PDF Report' }}
+          {{ pdfStatus || (generatingPdf ? 'Generating…' : 'Download PDF Report') }}
         </button>
         
         <button mat-raised-button 

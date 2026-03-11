@@ -1,6 +1,6 @@
 package com.plagiarism.detector.controller;
 
-import java.io.ByteArrayOutputStream;
+import java.io.OutputStream;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -8,9 +8,7 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 import com.itextpdf.text.BaseColor;
 import com.itextpdf.text.Chunk;
@@ -74,6 +73,22 @@ public class PlagiarismController {
 	private static final Font FONT_TABLE_HEADER = new Font(Font.FontFamily.HELVETICA, 10, Font.BOLD, COLOR_WHITE);
 	private static final Font FONT_TABLE_CELL = new Font(Font.FontFamily.HELVETICA, 9, Font.NORMAL, COLOR_TEXT);
 	private static final Font FONT_FOOTER = new Font(Font.FontFamily.HELVETICA, 8, Font.NORMAL, COLOR_SUBTEXT);
+
+	private static final BaseColor C_NAVY = new BaseColor(0x1E, 0x27, 0x61);
+	private static final BaseColor C_ACCENT = new BaseColor(0x66, 0x7E, 0xEA);
+	private static final BaseColor C_PURPLE = new BaseColor(0x76, 0x4B, 0xA2);
+	private static final BaseColor C_HIGH = new BaseColor(0xF4, 0x43, 0x36);
+	private static final BaseColor C_MEDIUM = new BaseColor(0xFF, 0x98, 0x00);
+	private static final BaseColor C_LOW = new BaseColor(0x4C, 0xAF, 0x50);
+	private static final BaseColor C_WHITE = BaseColor.WHITE;
+	private static final BaseColor C_LGRAY = new BaseColor(0xF5, 0xF5, 0xF5);
+	private static final BaseColor C_MGRAY = new BaseColor(0xE0, 0xE0, 0xE0);
+	private static final BaseColor C_TEXT = new BaseColor(0x21, 0x21, 0x21);
+	private static final BaseColor C_SUBTEXT = new BaseColor(0x75, 0x75, 0x75);
+
+	private Font f(int size, int style, BaseColor color) {
+		return new Font(Font.FontFamily.HELVETICA, size, style, color);
+	}
 
 	private final SubmissionRepository submissionRepository;
 	private final ComparisonResultRepository comparisonResultRepository;
@@ -380,444 +395,461 @@ public class PlagiarismController {
 	}
 
 	@PostMapping("/generate-report")
-	public ResponseEntity<byte[]> generateReport(@RequestBody AnalysisRequest request) {
-		try {
-			List<ComparisonResponse> results = new ArrayList<>();
-			List<Long> ids = request.getSubmissionIds();
+	public ResponseEntity<StreamingResponseBody> generateReport(@RequestBody AnalysisRequest request) {
 
-			for (var i = 0; i < ids.size() - 1; i++) {
-				for (int j = i + 1; j < ids.size(); j++) {
-					Optional<Submission> sub1Opt = submissionRepository.findById(ids.get(i));
-					Optional<Submission> sub2Opt = submissionRepository.findById(ids.get(j));
-					if (sub1Opt.isPresent() && sub2Opt.isPresent()) {
-						results.add(compareSubmissions(sub1Opt.get(), sub2Opt.get()));
+		List<Long> ids = request.getSubmissionIds();
+
+		if (ids == null || ids.size() < 2) {
+			return ResponseEntity.badRequest().build();
+		}
+
+		StreamingResponseBody stream = outputStream -> {
+			try {
+				// ── Collect results safely (skip any failing pair) ────────────
+				List<ComparisonResponse> results = new ArrayList<>();
+				List<String> errors = new ArrayList<>();
+
+				for (int i = 0; i < ids.size() - 1; i++) {
+					for (int j = i + 1; j < ids.size(); j++) {
+						try {
+							Optional<Submission> s1 = submissionRepository.findById(ids.get(i));
+							Optional<Submission> s2 = submissionRepository.findById(ids.get(j));
+							if (s1.isPresent() && s2.isPresent()) {
+								results.add(compareSubmissions(s1.get(), s2.get()));
+							}
+						} catch (Exception pairEx) {
+							// Log but continue — don't let one bad pair break the whole report
+							String msg = "Skipped pair (" + ids.get(i) + "," + ids.get(j) + "): " + pairEx.getMessage();
+							errors.add(msg);
+							System.err.println("[Report] " + msg);
+						}
 					}
 				}
+
+				// ── Stream PDF directly to response ──────────────────────────
+				writePdfToStream(results, errors, outputStream);
+				outputStream.flush();
+
+			} catch (Exception e) {
+				e.printStackTrace();
+				// Write a minimal error PDF so the browser gets a valid response
+				try {
+					writeErrorPdf("PDF generation failed: " + e.getMessage(), outputStream);
+					outputStream.flush();
+				} catch (Exception ignored) {
+				}
 			}
+		};
 
-			byte[] pdfBytes = generatePdfReport(results);
-
-			HttpHeaders headers = new HttpHeaders();
-			headers.setContentType(MediaType.APPLICATION_PDF);
-			headers.set(HttpHeaders.CONTENT_DISPOSITION,
-					"attachment; filename=\"plagiarism-report-" + System.currentTimeMillis() + ".pdf\"");
-			headers.setContentLength(pdfBytes.length);
-
-			return ResponseEntity.ok().headers(headers).body(pdfBytes);
-
-		} catch (Exception e) {
-			e.printStackTrace();
-			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
-		}
+		String filename = "plagiarism-report-" + System.currentTimeMillis() + ".pdf";
+		return ResponseEntity.ok().header("Content-Type", "application/pdf")
+				.header("Content-Disposition", "attachment; filename=\"" + filename + "\"")
+				.header("Cache-Control", "no-cache").body(stream);
 	}
 
-	private byte[] generatePdfReport(List<ComparisonResponse> results) throws Exception {
-		var document = new Document(PageSize.A4, 40, 40, 60, 60);
-		var baos = new ByteArrayOutputStream();
-		var writer = PdfWriter.getInstance(document, baos);
+	// ─────────────────────────────────────────────────────────────────────────────
+	// MAIN PDF WRITER (streams directly to OutputStream — no ByteArrayOutputStream)
+	// ─────────────────────────────────────────────────────────────────────────────
+	private void writePdfToStream(List<ComparisonResponse> results, List<String> skippedErrors, OutputStream out)
+			throws Exception {
 
-		// Header / Footer event handler
+		Document doc = new Document(PageSize.A4, 40, 40, 60, 60);
+		PdfWriter writer = PdfWriter.getInstance(doc, out);
+
+		// ── Page event: running header + footer ──────────────────────────────
 		writer.setPageEvent(new PdfPageEventHelper() {
 			@Override
-			public void onStartPage(PdfWriter w, Document doc) {
-				// Top gradient band
+			public void onStartPage(PdfWriter w, Document d) {
 				PdfContentByte cb = w.getDirectContentUnder();
 				cb.saveState();
-				cb.setColorFill(COLOR_PRIMARY);
-				cb.rectangle(0, PageSize.A4.getHeight() - 45, PageSize.A4.getWidth(), 45);
+				cb.setColorFill(C_NAVY);
+				cb.rectangle(0, PageSize.A4.getHeight() - 42, PageSize.A4.getWidth(), 42);
+				cb.fill();
+				cb.setColorFill(C_ACCENT);
+				cb.rectangle(PageSize.A4.getWidth() - 150, PageSize.A4.getHeight() - 42, 150, 42);
 				cb.fill();
 				cb.restoreState();
+				// Header text
+				PdfContentByte ct = w.getDirectContent();
+				ColumnText.showTextAligned(ct, Element.ALIGN_LEFT,
+						new Phrase("AI Code Plagiarism Detector",
+								new Font(Font.FontFamily.HELVETICA, 11, Font.BOLD, C_WHITE)),
+						50, PageSize.A4.getHeight() - 26, 0);
 			}
 
 			@Override
-			public void onEndPage(PdfWriter w, Document doc) {
-				// Footer line + text
+			public void onEndPage(PdfWriter w, Document d) {
 				PdfContentByte cb = w.getDirectContent();
+				// Footer rule
 				cb.saveState();
-				cb.setColorStroke(COLOR_MID_GRAY);
+				cb.setColorStroke(C_MGRAY);
 				cb.setLineWidth(0.5f);
-				cb.moveTo(40, 38);
-				cb.lineTo(PageSize.A4.getWidth() - 40, 38);
+				cb.moveTo(40, 36);
+				cb.lineTo(PageSize.A4.getWidth() - 40, 36);
 				cb.stroke();
-
-				ColumnText.showTextAligned(cb, Element.ALIGN_LEFT,
-						new Phrase("AI Code Plagiarism Detector  |  Anna University CDE", FONT_FOOTER), 40, 25, 0);
-				ColumnText.showTextAligned(cb, Element.ALIGN_RIGHT,
-						new Phrase("Page " + w.getPageNumber(), FONT_FOOTER), PageSize.A4.getWidth() - 40, 25, 0);
 				cb.restoreState();
+				ColumnText.showTextAligned(cb, Element.ALIGN_LEFT,
+						new Phrase("Anna University – Centre for Distance Education",
+								new Font(Font.FontFamily.HELVETICA, 7, Font.NORMAL, C_SUBTEXT)),
+						40, 24, 0);
+				ColumnText.showTextAligned(cb, Element.ALIGN_RIGHT,
+						new Phrase("Page " + w.getPageNumber(),
+								new Font(Font.FontFamily.HELVETICA, 7, Font.NORMAL, C_SUBTEXT)),
+						PageSize.A4.getWidth() - 40, 24, 0);
 			}
 		});
 
-		document.open();
+		doc.open();
 
-		// ── COVER BLOCK ──────────────────────────────────────────────────────────
+		// ── HERO BANNER ──────────────────────────────────────────────────────
 		PdfContentByte canvas = writer.getDirectContentUnder();
-
-		// Full-width hero gradient rectangle (draws at page top)
 		canvas.saveState();
-		// Simulate gradient with two overlapping rects
-		canvas.setColorFill(COLOR_PRIMARY);
-		canvas.rectangle(0, PageSize.A4.getHeight() - 160, PageSize.A4.getWidth(), 160);
+		canvas.setColorFill(C_NAVY);
+		canvas.rectangle(0, PageSize.A4.getHeight() - 160, PageSize.A4.getWidth(), 118);
 		canvas.fill();
-		canvas.setColorFill(COLOR_ACCENT);
-		canvas.setColorFill(new BaseColor(102, 126, 234, 80)); // semi-transparent accent
-		canvas.rectangle(PageSize.A4.getWidth() / 2, PageSize.A4.getHeight() - 160, PageSize.A4.getWidth() / 2, 160);
+		canvas.setColorFill(C_ACCENT);
+		canvas.rectangle(PageSize.A4.getWidth() / 2, PageSize.A4.getHeight() - 160, PageSize.A4.getWidth() / 2, 118);
 		canvas.fill();
-		// Bottom accent stripe
-		canvas.setColorFill(COLOR_PURPLE);
+		canvas.setColorFill(C_PURPLE);
 		canvas.rectangle(0, PageSize.A4.getHeight() - 163, PageSize.A4.getWidth(), 3);
 		canvas.fill();
 		canvas.restoreState();
 
-		// Overlay title text on the hero
-		PdfContentByte directContent = writer.getDirectContent();
-		var heroTitle = new Font(Font.FontFamily.HELVETICA, 20, Font.BOLD, COLOR_WHITE);
-		var heroSub = new Font(Font.FontFamily.HELVETICA, 10, Font.NORMAL, new BaseColor(220, 225, 255));
-		ColumnText.showTextAligned(directContent, Element.ALIGN_LEFT,
-				new Phrase("CODE PLAGIARISM ANALYSIS REPORT", heroTitle), 40, PageSize.A4.getHeight() - 90, 0);
-		ColumnText.showTextAligned(directContent, Element.ALIGN_LEFT,
-				new Phrase("AI-Powered Detection System  |  Anna University, Centre for Distance Education", heroSub),
-				40, PageSize.A4.getHeight() - 110, 0);
+		PdfContentByte dc = writer.getDirectContent();
+		ColumnText.showTextAligned(dc, Element.ALIGN_LEFT,
+				new Phrase("CODE PLAGIARISM ANALYSIS REPORT",
+						new Font(Font.FontFamily.HELVETICA, 20, Font.BOLD, C_WHITE)),
+				40, PageSize.A4.getHeight() - 95, 0);
 
 		String ts = LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd MMM yyyy, HH:mm"));
-		ColumnText.showTextAligned(directContent, Element.ALIGN_LEFT, new Phrase("Generated: " + ts, FONT_FOOTER), 40,
-				PageSize.A4.getHeight() - 130, 0);
+		ColumnText.showTextAligned(dc, Element.ALIGN_LEFT,
+				new Phrase("Generated: " + ts + "   |   Total comparisons: " + results.size(),
+						new Font(Font.FontFamily.HELVETICA, 9, Font.NORMAL, new BaseColor(210, 220, 255))),
+				40, PageSize.A4.getHeight() - 115, 0);
 
-		// Spacer to push content below hero
-		document.add(new Paragraph("\n\n\n\n\n\n\n"));
+		// Spacer below hero
+		doc.add(new Paragraph("\n\n\n\n\n\n\n"));
 
-		// ── SUMMARY STATS ────────────────────────────────────────────────────────
-		document.add(sectionHeading("Analysis Summary"));
+		// ── SUMMARY STATS ────────────────────────────────────────────────────
+		doc.add(sectionHeading("Analysis Summary"));
 
-		long highRisk = results.stream().filter(r -> "HIGH".equals(r.getStatus())).count();
-		long mediumRisk = results.stream().filter(r -> "MEDIUM".equals(r.getStatus())).count();
-		long lowRisk = results.stream().filter(r -> "LOW".equals(r.getStatus())).count();
-		double avgSim = results.isEmpty() ? 0
-				: results.stream().mapToDouble(ComparisonResponse::getOverallSimilarity).average().orElse(0);
+		long high = results.stream().filter(r -> "HIGH".equals(safe(r.getStatus()))).count();
+		long medium = results.stream().filter(r -> "MEDIUM".equals(safe(r.getStatus()))).count();
+		long low = results.stream().filter(r -> "LOW".equals(safe(r.getStatus()))).count();
+		double avg = results.isEmpty() ? 0
+				: results.stream().mapToDouble(r -> r.getOverallSimilarity()).average().orElse(0);
 
-		// 5-column stat table
-		var statTable = new PdfPTable(5);
-		statTable.setWidthPercentage(100);
-		statTable.setSpacingBefore(8);
-		statTable.setSpacingAfter(16);
+		PdfPTable stats = new PdfPTable(5);
+		stats.setWidthPercentage(100);
+		stats.setSpacingBefore(8);
+		stats.setSpacingAfter(14);
+		addStatCell(stats, String.valueOf(results.size()), "Total\nComparisons", C_ACCENT);
+		addStatCell(stats, String.valueOf(high), "High\nRisk", C_HIGH);
+		addStatCell(stats, String.valueOf(medium), "Medium\nRisk", C_MEDIUM);
+		addStatCell(stats, String.valueOf(low), "Low\nRisk", C_LOW);
+		addStatCell(stats, String.format("%.1f%%", avg), "Avg\nSimilarity", C_NAVY);
+		doc.add(stats);
 
-		addStatCell(statTable, String.valueOf(results.size()), "Total\nComparisons", COLOR_ACCENT);
-		addStatCell(statTable, String.valueOf(highRisk), "High\nRisk", COLOR_HIGH);
-		addStatCell(statTable, String.valueOf(mediumRisk), "Medium\nRisk", COLOR_MEDIUM);
-		addStatCell(statTable, String.valueOf(lowRisk), "Low\nRisk", COLOR_LOW);
-		addStatCell(statTable, String.format("%.1f%%", avgSim), "Avg\nSimilarity", COLOR_PRIMARY);
-		document.add(statTable);
+		// Warn about any skipped pairs
+		if (!skippedErrors.isEmpty()) {
+			Paragraph warn = new Paragraph(
+					"⚠  " + skippedErrors.size()
+							+ " comparison(s) were skipped due to errors and excluded from this report.",
+					new Font(Font.FontFamily.HELVETICA, 9, Font.ITALIC, C_MEDIUM));
+			warn.setSpacingAfter(8);
+			doc.add(warn);
+		}
 
-		// Divider
-		document.add(divider());
+		doc.add(divider());
 
-		// ── DETAILED RESULTS ─────────────────────────────────────────────────────
-		document.add(sectionHeading("Detailed Comparison Results"));
+		// ── DETAILED RESULTS (streamed one card at a time) ──────────────────
+		doc.add(sectionHeading("Detailed Comparison Results"));
 
-		for (var i = 0; i < results.size(); i++) {
-			ComparisonResponse r = results.get(i);
-			document.add(comparisonBlock(i + 1, r));
-			if (i < results.size() - 1) {
-				document.add(new Paragraph("\n"));
+		for (int i = 0; i < results.size(); i++) {
+			try {
+				doc.add(buildComparisonCard(i + 1, results.get(i)));
+			} catch (Exception cardEx) {
+				// If one card fails, add a minimal error row and continue
+				System.err.println("[Report] Card " + (i + 1) + " failed: " + cardEx.getMessage());
+				Paragraph errP = new Paragraph(
+						"⚠  Comparison " + (i + 1) + " could not be rendered (" + cardEx.getMessage() + ")",
+						new Font(Font.FontFamily.HELVETICA, 9, Font.ITALIC, C_HIGH));
+				doc.add(errP);
+			}
+
+			// Flush the output every 10 comparisons to prevent buffer accumulation
+			if ((i + 1) % 10 == 0) {
+				writer.flush();
 			}
 		}
 
-		// ── FOOTER NOTE ──────────────────────────────────────────────────────────
-		document.add(divider());
-		Paragraph note = new Paragraph(
-				"This report was automatically generated by the AI Code Plagiarism Detection System. "
-						+ "Similarity scores are computed using Token-Based and AST Structural analysis algorithms. "
-						+ "Results should be reviewed by a faculty member before taking academic action.",
-				new Font(Font.FontFamily.HELVETICA, 8, Font.ITALIC, COLOR_SUBTEXT));
-		note.setSpacingBefore(6);
-		document.add(note);
+		// ── DISCLAIMER ───────────────────────────────────────────────────────
+		doc.add(divider());
+		doc.add(new Paragraph(
+				"This report was auto-generated by the AI Code Plagiarism Detection System. "
+						+ "Scores use Token-Based + AST Structural algorithms. "
+						+ "Results should be reviewed by faculty before academic action.",
+				new Font(Font.FontFamily.HELVETICA, 7, Font.ITALIC, C_SUBTEXT)));
 
-		document.close();
-		return baos.toByteArray();
+		doc.close();
+	}
+
+	private String safe(String s) {
+		return s == null ? "" : s;
+	}
+
+	private double safeDbl(Double d) {
+		return d == null ? 0.0 : d;
 	}
 
 	// ─────────────────────────────────────────────────────────────────────────────
-	// HELPER: Section heading with left accent bar
+	// COMPARISON CARD
+	// ─────────────────────────────────────────────────────────────────────────────
+	private PdfPTable buildComparisonCard(int idx, ComparisonResponse r) throws Exception {
+		String status = safe(r.getStatus()).toUpperCase();
+		double overall = safeDbl(r.getOverallSimilarity());
+		double token = safeDbl(r.getTokenSimilarity());
+		double ast = safeDbl(r.getStructuralSimilarity());
+		String f1 = safe(r.getFile1Name());
+		String f2 = safe(r.getFile2Name());
+
+		BaseColor badge = "HIGH".equals(status) ? C_HIGH : "MEDIUM".equals(status) ? C_MEDIUM : C_LOW;
+
+		PdfPTable card = new PdfPTable(1);
+		card.setWidthPercentage(100);
+		card.setSpacingBefore(10);
+
+		PdfPCell outer = new PdfPCell();
+		outer.setBorderColor(C_MGRAY);
+		outer.setBorderWidth(0.5f);
+		outer.setPadding(0);
+
+		// ── Header row ──
+		PdfPTable hdr = new PdfPTable(new float[] { 7f, 2.5f });
+		hdr.setWidthPercentage(100);
+
+		PdfPCell titleC = new PdfPCell();
+		titleC.setBorder(Rectangle.NO_BORDER);
+		titleC.setBackgroundColor(C_LGRAY);
+		titleC.setPadding(9);
+		titleC.addElement(
+				new Paragraph("Comparison " + idx, new Font(Font.FontFamily.HELVETICA, 11, Font.BOLD, C_NAVY)));
+		hdr.addCell(titleC);
+
+		PdfPCell badgeC = new PdfPCell();
+		badgeC.setBorder(Rectangle.NO_BORDER);
+		badgeC.setBackgroundColor(badge);
+		badgeC.setPadding(9);
+		badgeC.setVerticalAlignment(Element.ALIGN_MIDDLE);
+		Paragraph bp = new Paragraph(status + " RISK", new Font(Font.FontFamily.HELVETICA, 10, Font.BOLD, C_WHITE));
+		bp.setAlignment(Element.ALIGN_CENTER);
+		badgeC.addElement(bp);
+		hdr.addCell(badgeC);
+		outer.addElement(hdr);
+
+		// ── File names ──
+		PdfPTable files = new PdfPTable(new float[] { 5f, 1f, 5f });
+		files.setWidthPercentage(100);
+
+		PdfPCell fc1 = new PdfPCell();
+		fc1.setBorder(Rectangle.NO_BORDER);
+		fc1.setBackgroundColor(new BaseColor(0xEE, 0xF1, 0xFB));
+		fc1.setPadding(9);
+		fc1.addElement(new Paragraph("📄  " + f1, new Font(Font.FontFamily.HELVETICA, 10, Font.BOLD, C_TEXT)));
+		files.addCell(fc1);
+
+		PdfPCell vsC = new PdfPCell(new Phrase("↔", new Font(Font.FontFamily.HELVETICA, 14, Font.BOLD, C_ACCENT)));
+		vsC.setBorder(Rectangle.NO_BORDER);
+		vsC.setHorizontalAlignment(Element.ALIGN_CENTER);
+		vsC.setVerticalAlignment(Element.ALIGN_MIDDLE);
+		vsC.setPadding(8);
+		files.addCell(vsC);
+
+		PdfPCell fc2 = new PdfPCell();
+		fc2.setBorder(Rectangle.NO_BORDER);
+		fc2.setBackgroundColor(new BaseColor(0xEE, 0xF1, 0xFB));
+		fc2.setPadding(9);
+		Paragraph p2 = new Paragraph("📄  " + f2, new Font(Font.FontFamily.HELVETICA, 10, Font.BOLD, C_TEXT));
+		p2.setAlignment(Element.ALIGN_RIGHT);
+		fc2.addElement(p2);
+		files.addCell(fc2);
+		outer.addElement(files);
+
+		// ── Similarity bar ──
+		PdfPCell simCell = new PdfPCell();
+		simCell.setBorder(Rectangle.NO_BORDER);
+		simCell.setPadding(10);
+
+		PdfPTable simLbl = new PdfPTable(new float[] { 7f, 3f });
+		simLbl.setWidthPercentage(100);
+		PdfPCell lblC = new PdfPCell(
+				new Phrase("Overall Similarity", new Font(Font.FontFamily.HELVETICA, 9, Font.BOLD, C_SUBTEXT)));
+		lblC.setBorder(Rectangle.NO_BORDER);
+		PdfPCell pctC = new PdfPCell(new Phrase(String.format("%.2f%%", overall),
+				new Font(Font.FontFamily.HELVETICA, 14, Font.BOLD, C_ACCENT)));
+		pctC.setBorder(Rectangle.NO_BORDER);
+		pctC.setHorizontalAlignment(Element.ALIGN_RIGHT);
+		simLbl.addCell(lblC);
+		simLbl.addCell(pctC);
+		simCell.addElement(simLbl);
+
+		// Progress bar
+		float fill = (float) Math.max(0, Math.min(overall, 100));
+		float empty = 100f - fill;
+		PdfPTable bar = new PdfPTable(fill > 0 && empty > 0 ? new float[] { fill, empty } : new float[] { 100f });
+		bar.setWidthPercentage(100);
+		if (fill > 0 && empty > 0) {
+			PdfPCell filled = new PdfPCell();
+			filled.setBorder(Rectangle.NO_BORDER);
+			filled.setFixedHeight(7);
+			filled.setBackgroundColor(badge);
+			bar.addCell(filled);
+			PdfPCell emptyC = new PdfPCell();
+			emptyC.setBorder(Rectangle.NO_BORDER);
+			emptyC.setFixedHeight(7);
+			emptyC.setBackgroundColor(C_MGRAY);
+			bar.addCell(emptyC);
+		} else {
+			PdfPCell full = new PdfPCell();
+			full.setBorder(Rectangle.NO_BORDER);
+			full.setFixedHeight(7);
+			full.setBackgroundColor(fill >= 100 ? badge : C_MGRAY);
+			bar.addCell(full);
+		}
+		simCell.addElement(bar);
+		outer.addElement(simCell);
+
+		// ── Algorithm breakdown ──
+		PdfPTable algo = new PdfPTable(2);
+		algo.setWidthPercentage(100);
+		algo.addCell(algoCell("Token-Based Similarity", String.format("%.2f%%", token), C_ACCENT));
+		algo.addCell(algoCell("Structural (AST) Similarity", String.format("%.2f%%", ast), C_PURPLE));
+		outer.addElement(algo);
+
+		// ── Matching segments ──
+		if (r.getMatches() != null && !r.getMatches().isEmpty()) {
+			PdfPCell matchC = new PdfPCell();
+			matchC.setBorder(Rectangle.NO_BORDER);
+			matchC.setPaddingLeft(10);
+			matchC.setPaddingRight(10);
+			matchC.setPaddingBottom(10);
+
+			Paragraph mTitle = new Paragraph("Matching Code Segments",
+					new Font(Font.FontFamily.HELVETICA, 11, Font.BOLD, C_NAVY));
+			mTitle.setSpacingBefore(8);
+			mTitle.setSpacingAfter(5);
+			matchC.addElement(mTitle);
+
+			PdfPTable mt = new PdfPTable(new float[] { 4f, 4f, 2f });
+			mt.setWidthPercentage(100);
+			for (String h : new String[] { "File 1 Lines", "File 2 Lines", "Similarity" }) {
+				PdfPCell mh = new PdfPCell(new Phrase(h, new Font(Font.FontFamily.HELVETICA, 9, Font.BOLD, C_WHITE)));
+				mh.setBackgroundColor(C_NAVY);
+				mh.setPadding(6);
+				mh.setBorder(Rectangle.NO_BORDER);
+				mh.setHorizontalAlignment(Element.ALIGN_CENTER);
+				mt.addCell(mh);
+			}
+			boolean alt = false;
+			for (var m : r.getMatches()) {
+				BaseColor rowBg = alt ? C_LGRAY : C_WHITE;
+				alt = !alt;
+				for (String txt : new String[] { "Lines " + safe(m.getLine1Range()),
+						"Lines " + safe(m.getLine2Range()) }) {
+					PdfPCell mc = new PdfPCell(
+							new Phrase(txt, new Font(Font.FontFamily.HELVETICA, 9, Font.NORMAL, C_TEXT)));
+					mc.setBackgroundColor(rowBg);
+					mc.setPadding(6);
+					mc.setBorder(Rectangle.BOTTOM);
+					mc.setBorderColor(C_MGRAY);
+					mc.setBorderWidth(0.3f);
+					mt.addCell(mc);
+				}
+				PdfPCell sc = new PdfPCell(new Phrase(String.format("%.2f%%", safeDbl(m.getSimilarity())),
+						new Font(Font.FontFamily.HELVETICA, 9, Font.BOLD, C_WHITE)));
+				sc.setBackgroundColor(C_ACCENT);
+				sc.setHorizontalAlignment(Element.ALIGN_CENTER);
+				sc.setVerticalAlignment(Element.ALIGN_MIDDLE);
+				sc.setPadding(6);
+				sc.setBorder(Rectangle.NO_BORDER);
+				mt.addCell(sc);
+			}
+			matchC.addElement(mt);
+			outer.addElement(matchC);
+		}
+
+		card.addCell(outer);
+		return card;
+	}
+
+	private void writeErrorPdf(String message, OutputStream out) throws Exception {
+		Document doc = new Document(PageSize.A4, 60, 60, 80, 60);
+		PdfWriter.getInstance(doc, out);
+		doc.open();
+		doc.add(new Paragraph("Report Generation Error", new Font(Font.FontFamily.HELVETICA, 18, Font.BOLD, C_HIGH)));
+		doc.add(new Paragraph("\n"));
+		doc.add(new Paragraph(message, new Font(Font.FontFamily.HELVETICA, 11, Font.NORMAL, C_TEXT)));
+		doc.add(new Paragraph("\nPlease check the server logs and try again.",
+				new Font(Font.FontFamily.HELVETICA, 10, Font.ITALIC, C_SUBTEXT)));
+		doc.close();
+	}
+
+	// ─────────────────────────────────────────────────────────────────────────────
+	// SECTION HEADING
 	// ─────────────────────────────────────────────────────────────────────────────
 	private Paragraph sectionHeading(String text) {
-		var p = new Paragraph(text, FONT_SECTION);
+		Paragraph p = new Paragraph(text, new Font(Font.FontFamily.HELVETICA, 13, Font.BOLD, C_NAVY));
 		p.setSpacingBefore(10);
 		p.setSpacingAfter(6);
-		// Left border via chunk with background
 		p.setIndentationLeft(8);
 		return p;
 	}
 
 	// ─────────────────────────────────────────────────────────────────────────────
-	// HELPER: Thin divider line
+	// DIVIDER
 	// ─────────────────────────────────────────────────────────────────────────────
 	private Paragraph divider() {
-		var p = new Paragraph();
-		p.add(new Chunk(new LineSeparator(0.5f, 100, COLOR_MID_GRAY, Element.ALIGN_CENTER, -2)));
-		p.setSpacingBefore(4);
-		p.setSpacingAfter(4);
+		Paragraph p = new Paragraph();
+		p.add(new Chunk(new LineSeparator(0.5f, 100, C_MGRAY, Element.ALIGN_CENTER, -2)));
+		p.setSpacingBefore(6);
+		p.setSpacingAfter(6);
 		return p;
 	}
 
 	// ─────────────────────────────────────────────────────────────────────────────
-	// HELPER: Stat box cell
+	// STAT CELL
 	// ─────────────────────────────────────────────────────────────────────────────
-	private void addStatCell(PdfPTable table, String value, String label, BaseColor color) {
-		var cell = new PdfPCell();
-		cell.setBorder(Rectangle.NO_BORDER);
-		cell.setBackgroundColor(color);
-		cell.setPadding(12);
-
-		Paragraph val = new Paragraph(value, new Font(Font.FontFamily.HELVETICA, 18, Font.BOLD, COLOR_WHITE));
-		val.setAlignment(Element.ALIGN_CENTER);
-		cell.addElement(val);
-
-		Paragraph lbl = new Paragraph(label,
+	private void addStatCell(PdfPTable t, String val, String label, BaseColor color) {
+		PdfPCell c = new PdfPCell();
+		c.setBorder(Rectangle.NO_BORDER);
+		c.setBackgroundColor(color);
+		c.setPadding(10);
+		Paragraph v = new Paragraph(val, new Font(Font.FontFamily.HELVETICA, 18, Font.BOLD, C_WHITE));
+		v.setAlignment(Element.ALIGN_CENTER);
+		c.addElement(v);
+		Paragraph l = new Paragraph(label,
 				new Font(Font.FontFamily.HELVETICA, 8, Font.NORMAL, new BaseColor(220, 225, 255)));
-		lbl.setAlignment(Element.ALIGN_CENTER);
-		cell.addElement(lbl);
-
-		table.addCell(cell);
+		l.setAlignment(Element.ALIGN_CENTER);
+		c.addElement(l);
+		t.addCell(c);
 	}
 
 	// ─────────────────────────────────────────────────────────────────────────────
-	// HELPER: Full comparison block (card-style)
+	// ALGO CELL
 	// ─────────────────────────────────────────────────────────────────────────────
-	private PdfPTable comparisonBlock(int index, ComparisonResponse r) throws Exception {
-		// Outer wrapper table (1 col, gives card border)
-		var wrapper = new PdfPTable(1);
-		wrapper.setWidthPercentage(100);
-		wrapper.setSpacingBefore(8);
-
-		var card = new PdfPCell();
-		card.setBorderColor(COLOR_MID_GRAY);
-		card.setBorderWidth(0.5f);
-		card.setPadding(0);
-
-		// ── Card header row: "Comparison N" + status badge ──
-		var header = new PdfPTable(new float[] { 6f, 2f });
-		header.setWidthPercentage(100);
-
-		// Left: title
-		var titleCell = new PdfPCell();
-		titleCell.setBorder(Rectangle.NO_BORDER);
-		titleCell.setBackgroundColor(COLOR_LIGHT_GRAY);
-		titleCell.setPadding(10);
-		var compTitle = new Paragraph("Comparison " + index,
-				new Font(Font.FontFamily.HELVETICA, 11, Font.BOLD, COLOR_PRIMARY));
-		titleCell.addElement(compTitle);
-		header.addCell(titleCell);
-
-		// Right: status badge
-		BaseColor badgeColor = "HIGH".equals(r.getStatus()) ? COLOR_HIGH
-				: "MEDIUM".equals(r.getStatus()) ? COLOR_MEDIUM : COLOR_LOW;
-		var badgeCell = new PdfPCell();
-		badgeCell.setBorder(Rectangle.NO_BORDER);
-		badgeCell.setBackgroundColor(badgeColor);
-		badgeCell.setPadding(10);
-		badgeCell.setVerticalAlignment(Element.ALIGN_MIDDLE);
-		var badge = new Paragraph(r.getStatus() + " RISK",
-				new Font(Font.FontFamily.HELVETICA, 10, Font.BOLD, COLOR_WHITE));
-		badge.setAlignment(Element.ALIGN_CENTER);
-		badgeCell.addElement(badge);
-		header.addCell(badgeCell);
-
-		// ── File names row ──
-		var fileRow = new PdfPTable(new float[] { 5f, 1f, 5f });
-		fileRow.setWidthPercentage(100);
-
-		var f1 = fileCell(r.getFile1Name(), true);
-		var vs = new PdfPCell(new Phrase("↔", new Font(Font.FontFamily.HELVETICA, 14, Font.BOLD, COLOR_ACCENT)));
-		vs.setHorizontalAlignment(Element.ALIGN_CENTER);
-		vs.setVerticalAlignment(Element.ALIGN_MIDDLE);
-		vs.setBorder(Rectangle.NO_BORDER);
-		vs.setPadding(8);
-		PdfPCell f2 = fileCell(r.getFile2Name(), false);
-
-		fileRow.addCell(f1);
-		fileRow.addCell(vs);
-		fileRow.addCell(f2);
-
-		// ── Similarity progress bar section ──
-		var simSection = new PdfPTable(1);
-		simSection.setWidthPercentage(100);
-		var simCell = new PdfPCell();
-		simCell.setBorder(Rectangle.NO_BORDER);
-		simCell.setPadding(10);
-
-		// Label + value
-		var simLabelRow = new PdfPTable(new float[] { 7f, 3f });
-		simLabelRow.setWidthPercentage(100);
-		var simLbl = new PdfPCell(new Phrase("Overall Similarity", FONT_LABEL));
-		simLbl.setBorder(Rectangle.NO_BORDER);
-		var simVal = new PdfPCell(new Phrase(String.format("%.2f%%", r.getOverallSimilarity()),
-				new Font(Font.FontFamily.HELVETICA, 14, Font.BOLD, COLOR_ACCENT)));
-		simVal.setBorder(Rectangle.NO_BORDER);
-		simVal.setHorizontalAlignment(Element.ALIGN_RIGHT);
-		simLabelRow.addCell(simLbl);
-		simLabelRow.addCell(simVal);
-		simCell.addElement(simLabelRow);
-
-		// Progress bar (drawn as two stacked rectangles via a nested table)
-		float pct = (float) Math.min(r.getOverallSimilarity(), 100.0);
-		var progressOuter = new PdfPTable(1);
-		progressOuter.setWidthPercentage(100);
-		var bgBar = new PdfPCell();
-		bgBar.setBorder(Rectangle.NO_BORDER);
-		bgBar.setFixedHeight(8);
-		bgBar.setBackgroundColor(COLOR_MID_GRAY);
-		bgBar.setPadding(0);
-
-		// Inner filled portion (as nested table with 2 cells by percentage)
-		float fillW = pct;
-		float emptyW = 100f - fillW;
-		if (fillW > 0 && emptyW > 0) {
-			var innerBar = new PdfPTable(new float[] { fillW, emptyW });
-			innerBar.setWidthPercentage(100);
-			var filled = new PdfPCell();
-			filled.setBorder(Rectangle.NO_BORDER);
-			filled.setFixedHeight(8);
-			filled.setBackgroundColor(badgeColor);
-			var empty = new PdfPCell();
-			empty.setBorder(Rectangle.NO_BORDER);
-			empty.setFixedHeight(8);
-			empty.setBackgroundColor(COLOR_MID_GRAY);
-			innerBar.addCell(filled);
-			innerBar.addCell(empty);
-			bgBar.addElement(innerBar);
-		} else if (fillW >= 100) {
-			bgBar.setBackgroundColor(badgeColor);
-		}
-
-		progressOuter.addCell(bgBar);
-		simCell.addElement(progressOuter);
-		simSection.addCell(simCell);
-
-		// ── Algorithm breakdown (2-col) ──
-		var algoTable = new PdfPTable(2);
-		algoTable.setWidthPercentage(100);
-
-		algoTable.addCell(
-				algoCell("Token-Based Similarity", String.format("%.2f%%", r.getTokenSimilarity()), COLOR_ACCENT));
-		algoTable.addCell(algoCell("Structural (AST) Similarity", String.format("%.2f%%", r.getStructuralSimilarity()),
-				COLOR_PURPLE));
-
-		// ── Matching segments table ──
-		PdfPCell matchWrapper = null;
-		if (r.getMatches() != null && !r.getMatches().isEmpty()) {
-			matchWrapper = new PdfPCell();
-			matchWrapper.setBorder(Rectangle.NO_BORDER);
-			matchWrapper.setPaddingLeft(10);
-			matchWrapper.setPaddingRight(10);
-			matchWrapper.setPaddingBottom(10);
-
-			var matchTitle = new Paragraph("Matching Code Segments", FONT_SECTION);
-			matchTitle.setSpacingAfter(6);
-			matchWrapper.addElement(matchTitle);
-
-			var matchTable = new PdfPTable(new float[] { 4f, 4f, 2f });
-			matchTable.setWidthPercentage(100);
-
-			// Header
-			addMatchHeader(matchTable, "File 1 Lines");
-			addMatchHeader(matchTable, "File 2 Lines");
-			addMatchHeader(matchTable, "Similarity");
-
-			// Rows
-			var alt = false;
-			for (var match : r.getMatches()) {
-				BaseColor rowBg = alt ? COLOR_LIGHT_GRAY : COLOR_WHITE;
-				alt = !alt;
-				addMatchRow(matchTable, "Lines " + match.getLine1Range(), rowBg);
-				addMatchRow(matchTable, "Lines " + match.getLine2Range(), rowBg);
-
-				var simChip = new PdfPCell(new Phrase(String.format("%.2f%%", match.getSimilarity()),
-						new Font(Font.FontFamily.HELVETICA, 9, Font.BOLD, COLOR_WHITE)));
-				simChip.setBackgroundColor(COLOR_ACCENT);
-				simChip.setHorizontalAlignment(Element.ALIGN_CENTER);
-				simChip.setVerticalAlignment(Element.ALIGN_MIDDLE);
-				simChip.setPadding(5);
-				simChip.setBorder(Rectangle.NO_BORDER);
-				matchTable.addCell(simChip);
-			}
-
-			matchWrapper.addElement(matchTable);
-		}
-
-		// ── Assemble card ──
-		card.addElement(header);
-		card.addElement(fileRow);
-		card.addElement(new Paragraph(" ")); // small spacer
-		card.addElement(simSection);
-		card.addElement(algoTable);
-		if (matchWrapper != null) {
-			card.addElement(matchWrapper);
-		}
-
-		wrapper.addCell(card);
-		return wrapper;
-	}
-
-	// ─────────────────────────────────────────────────────────────────────────────
-	// HELPER: File name cell
-	// ─────────────────────────────────────────────────────────────────────────────
-	private PdfPCell fileCell(String name, boolean isLeft) {
-		var cell = new PdfPCell();
-		cell.setBorder(Rectangle.NO_BORDER);
-		cell.setBackgroundColor(COLOR_LIGHT_GRAY);
-		cell.setPadding(10);
-		cell.setHorizontalAlignment(isLeft ? Element.ALIGN_LEFT : Element.ALIGN_RIGHT);
-
-		var p = new Paragraph("📄 " + name, FONT_VALUE_BOLD);
-		p.setAlignment(isLeft ? Element.ALIGN_LEFT : Element.ALIGN_RIGHT);
-		cell.addElement(p);
-		return cell;
-	}
-
-	// ─────────────────────────────────────────────────────────────────────────────
-	// HELPER: Algorithm score cell
-	// ─────────────────────────────────────────────────────────────────────────────
-	private PdfPCell algoCell(String label, String value, BaseColor accentColor) {
-		var cell = new PdfPCell();
-		cell.setBorder(Rectangle.LEFT);
-		cell.setBorderColorLeft(accentColor);
-		cell.setBorderWidthLeft(3f);
-		cell.setBackgroundColor(COLOR_LIGHT_GRAY);
-		cell.setPadding(10);
-		cell.setPaddingLeft(14);
-
-		var lbl = new Paragraph(label, FONT_LABEL);
-		lbl.setSpacingAfter(4);
-		cell.addElement(lbl);
-
-		var val = new Paragraph(value, new Font(Font.FontFamily.HELVETICA, 15, Font.BOLD, accentColor));
-		cell.addElement(val);
-		return cell;
-	}
-
-	// ─────────────────────────────────────────────────────────────────────────────
-	// HELPER: Match table header cell
-	// ─────────────────────────────────────────────────────────────────────────────
-	private void addMatchHeader(PdfPTable table, String text) {
-		var cell = new PdfPCell(new Phrase(text, FONT_TABLE_HEADER));
-		cell.setBackgroundColor(COLOR_PRIMARY);
-		cell.setPadding(7);
-		cell.setBorder(Rectangle.NO_BORDER);
-		cell.setHorizontalAlignment(Element.ALIGN_CENTER);
-		table.addCell(cell);
-	}
-
-	// ─────────────────────────────────────────────────────────────────────────────
-	// HELPER: Match table data cell
-	// ─────────────────────────────────────────────────────────────────────────────
-	private void addMatchRow(PdfPTable table, String text, BaseColor bg) {
-		var cell = new PdfPCell(new Phrase(text, FONT_TABLE_CELL));
-		cell.setBackgroundColor(bg);
-		cell.setPadding(6);
-		cell.setBorder(Rectangle.BOTTOM);
-		cell.setBorderColor(COLOR_MID_GRAY);
-		cell.setBorderWidth(0.3f);
-		table.addCell(cell);
+	private PdfPCell algoCell(String label, String value, BaseColor accent) {
+		PdfPCell c = new PdfPCell();
+		c.setBorder(Rectangle.LEFT);
+		c.setBorderColorLeft(accent);
+		c.setBorderWidthLeft(3f);
+		c.setBackgroundColor(C_LGRAY);
+		c.setPadding(10);
+		c.setPaddingLeft(14);
+		Paragraph l = new Paragraph(label, new Font(Font.FontFamily.HELVETICA, 8, Font.BOLD, C_SUBTEXT));
+		l.setSpacingAfter(4);
+		c.addElement(l);
+		c.addElement(new Paragraph(value, new Font(Font.FontFamily.HELVETICA, 15, Font.BOLD, accent)));
+		return c;
 	}
 
 	/**
